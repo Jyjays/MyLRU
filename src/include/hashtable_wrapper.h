@@ -1,47 +1,21 @@
 #ifndef HASHTABLE_WRAPPER_H
 #define HASHTABLE_WRAPPER_H
 
-// =====================================================================================
-// Preprocessor Directives for Hash Table Implementation Choice
-// =====================================================================================
-// Define ONE of these macros in your build system (e.g., CMakeLists.txt, Makefile, or IDE project settings)
-// or define it here directly before including this header for testing.
-//
-// Example:
-// #define USE_LIBCUCKOO
-// #define USE_MY_EXTENDIBLE_HASH_TABLE
-
-// For this initial version, we'll assume USE_LIBCUCKOO is defined for libcuckoo.
-// If you define USE_MY_EXTENDIBLE_HASH_TABLE, you'll need to provide its implementation.
-
-// =====================================================================================
-// Conditional Includes
-// =====================================================================================
 #ifdef USE_LIBCUCKOO
-    // Include the libcuckoo hash map header.
-    // Make sure libcuckoo is in your include path and linked correctly.
-    // You can get libcuckoo from: https://github.com/efficient/libcuckoo
     #include <libcuckoo/cuckoohash_map.hh>
 #elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
-    // Placeholder for your custom extendible hash table header
-    // #include "my_extendible_hash_table.h" // You will create this file
-    // For now, we'll add a compile-time error if this is selected but not implemented.
-    #error "USE_MY_EXTENDIBLE_HASH_TABLE is defined, but the implementation is not yet provided in this wrapper."
+    #include "extendible_hash_table.h"
 #else
-    // Default to libcuckoo if nothing is explicitly defined, or throw an error.
-    // For clarity, it's better to require explicit definition.
     #warning "No specific hash table implementation selected. Defaulting to USE_LIBCUCKOO. Define USE_LIBCUCKOO or USE_MY_EXTENDIBLE_HASH_TABLE explicitly."
     #define USE_LIBCUCKOO
     #include <libcuckoo/cuckoohash_map.hh>
-    // Alternatively, you could throw an error:
-    // #error "No hash table implementation selected. Define USE_LIBCUCKOO or USE_MY_EXTENDIBLE_HASH_TABLE."
 #endif
 
-#include <functional> // For std::hash, std::equal_to
-#include <string>     // For potential key types, though templates make it generic
+#include <functional> 
+#include <string>   
 
-// Forward declaration if your Value type is complex and needs it (e.g., pointer to LRU node)
-// template <typename Key, typename Value> struct LruNode;
+namespace myLru{
+
 
 
 /**
@@ -219,3 +193,4 @@ private:
 
 #endif // HASHTABLE_WRAPPER_H
 
+} // namespace myLru
