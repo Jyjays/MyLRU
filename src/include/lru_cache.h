@@ -1,6 +1,6 @@
 #include <atomic>
 #include <mutex>
-
+#include "config.h"
 #include "hashtable_wrapper.h"
 
 namespace myLru {
@@ -29,13 +29,16 @@ class LRUCache {
 
   bool Find(const Key& key, Value& value);
 
-  bool Insert(const Key& key, Value& value);
+  bool Insert(const Key& key, Value value);
 
   bool Remove(const Key& key);
 
   size_t Size();
   void Clear();
   void Resize(size_t size);
+  bool IsEmpty() { return cur_size_ == 0; }
+  size_t Capacity() { return max_size_; }
+  bool IsFull() { return cur_size_ == max_size_; }
 
  private:
   HashTableWrapper<Key, LRUNode*, Hash, KeyEqual> hash_table_;

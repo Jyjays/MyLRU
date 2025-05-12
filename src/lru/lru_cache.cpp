@@ -25,7 +25,19 @@ bool LRUCACHE::Find(const Key& key, Value& value) {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool LRUCACHE::Insert(const Key& key, Value& value) {
+bool LRUCACHE::Insert(const Key& key, Value value) {
+    LRUNode *node;
+    if (hash_table_.Get(key, node)) {
+        LRUNode* new_node = new LRUNode(key, value);
+        Remove(key);    // Remove the old node
+        push_node(new_node);
+        if (!hash_table_.Insert(key, new_node)) {
+            delete new_node;
+            return false;
+        }
+        cur_size_++;
+        return true;
+    }
     LRUNode* new_node = new LRUNode(key,value);
     if (!hash_table_.Insert(key, new_node)) {
         delete new_node;
@@ -89,18 +101,22 @@ void LRUCACHE::evict(){
         return;
     }
     remove_node(last_node);
-    hash_table_.Remove(last_node->key_);
+    if (!hash_table_.Remove(last_node->key_)) {
+        LRU_ERR("Failed to remove key from hash table");
+    }
+    cur_size_--;
     delete last_node;
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
 void LRUCACHE::push_node(LRUNode* node) {
-    assert(node != nullptr);
+    LRU_ASSERT(node != head_ && node != tail_ && node != nullptr, "Invalid node");
 
     LRUNode* ori_first = head_->next_;
     ori_first->prev_ = node;
     node->next_ = ori_first;
     node->prev_ = head_;
+    head_->next_ = node;
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS 
@@ -110,9 +126,11 @@ void LRUCACHE::remove_node(LRUNode* node) {
     LRUNode* ori_prev = node->prev_;
     ori_next->prev_ = ori_prev;
     ori_prev->next_ = ori_next;
+    node->next_ = nullptr;
+    node->prev_ = nullptr;
 }
 
-template class LRUCache<int, std::string, std::hash<int>, std::equal_to<int>>;
+template class LRUCache<KeyType, ValueType, HashType, KeyEqualType>;
 
 
 };  // namespace myLru
