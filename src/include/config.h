@@ -1,6 +1,12 @@
 #include <cstdint>
 #include <functional>
 
+static const int kNumSegBits = 4;
+static const int segNum = 1 << kNumSegBits;
+
+static const int threadNum = 8;
+static const int testsNum = 1000000;
+
 
 using KeyType = int64_t;
 using ValueType = std::array<char, 16>;
