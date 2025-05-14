@@ -33,18 +33,18 @@ class LRUCache {
   LRUCache(const LRUCache&) = delete;
   LRUCache& operator=(const LRUCache&) = delete;
   ~LRUCACHE();
-  bool Find(const Key& key, Value& value);
+  auto Find(const Key& key, Value& value) -> bool;
 
-  bool Insert(const Key& key, Value value);
+  auto Insert(const Key& key, Value value) -> bool;
 
-  bool Remove(const Key& key);
+  auto Remove(const Key& key) -> bool;
 
-  size_t Size();
-  void Clear();
-  void Resize(size_t size);
-  bool IsEmpty() { return cur_size_ == 0; }
-  size_t Capacity() { return max_size_; }
-  bool IsFull() { return cur_size_ == max_size_; }
+  auto Size() -> size_t;
+  auto Clear() -> void;
+  auto Resize(size_t size) -> void;
+  auto IsEmpty() -> bool { return cur_size_ == 0; }
+  auto Capacity() -> size_t { return max_size_; }
+  auto IsFull() -> bool { return cur_size_ == max_size_; }
 
  private:
   HashTableWrapper<Key, LRUNode*, Hash, KeyEqual> hash_table_;
@@ -54,13 +54,13 @@ class LRUCache {
   size_t max_size_;
   std::atomic<size_t> cur_size_;
 
-  void evict();
+  auto evict() -> void;
 
-  void push_node(LRUNode* node);
+  auto push_node(LRUNode* node) -> void;
 
-  void remove_node(LRUNode* node);
+  auto remove_node(LRUNode* node) -> void;
 
-  bool remove_helper(const Key& key, LRUNode* del_node);
+  auto remove_helper(const Key& key, LRUNode* del_node) -> bool;
 };
 
 template <typename Key, typename Value, typename Hash = std::hash<Key>,
@@ -68,23 +68,23 @@ template <typename Key, typename Value, typename Hash = std::hash<Key>,
 class SegLRUCache {
  public:
   explicit SegLRUCache(size_t capacity);
-  bool Find(const Key& key, Value& value);
-  bool Insert(const Key& key, Value value);
-  bool Remove(const Key& key);
-  size_t Size();
-  void Clear();
-  void Resize(size_t size);
-  size_t Capacity();
-  bool IsEmpty();
-  bool IsFull();
+  auto Find(const Key& key, Value& value) -> bool;
+  auto Insert(const Key& key, Value value) -> bool;
+  auto Remove(const Key& key) -> bool;
+  auto Size() -> size_t;
+  auto Clear() -> void;
+  auto Resize(size_t size) -> void;
+  auto Capacity() -> size_t;
+  auto IsEmpty() -> bool;
+  auto IsFull() -> bool;
 
  private:
   LRUCACHE lru_cache_[segNum];
-  static uint32_t Shard(size_t hash) { 
+  static auto Shard(size_t hash) -> uint32_t {
     return static_cast<uint32_t>(hash & (segNum - 1));
   }
 
-  static size_t SegHash(const Key& key) { 
+  static auto SegHash(const Key& key) -> size_t {
     return std::hash<KeyType>()(key);
   }
 };

@@ -1,12 +1,13 @@
 #ifndef HASHTABLE_WRAPPER_H
 #define HASHTABLE_WRAPPER_H
 
+
 #ifdef USE_LIBCUCKOO
     #include <libcuckoo/cuckoohash_map.hh>
-#elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
-    #include "extendible_hash_table.h"
+#elif defined(USE_MY_HASH_TABLE)
+    #include "hash_table.h"
 #else
-    #warning "No specific hash table implementation selected. Defaulting to USE_LIBCUCKOO. Define USE_LIBCUCKOO or USE_MY_EXTENDIBLE_HASH_TABLE explicitly."
+    #warning "No specific hash table implementation selected. Defaulting to USE_LIBCUCKOO. Define USE_LIBCUCKOO or USE_MY_HASH_TABLE explicitly."
     #define USE_LIBCUCKOO
     #include <libcuckoo/cuckoohash_map.hh>
 #endif
@@ -23,7 +24,7 @@ namespace myLru{
  *
  * This class provides a common interface (Insert, Get, Remove) for different
  * underlying hash table implementations. The choice of implementation can be
- * controlled via preprocessor directives (USE_LIBCUCKOO or USE_MY_EXTENDIBLE_HASH_TABLE).
+ * controlled via preprocessor directives (USE_LIBCUCKOO or USE_MY_HASH_TABLE).
  *
  * It is designed to be thread-safe if the underlying hash table implementation
  * (like libcuckoo) is thread-safe.
@@ -82,10 +83,8 @@ public:
     bool Insert(const Key& key, const Value& value) {
 #ifdef USE_LIBCUCKOO
         return table_.insert(key, value);
-#elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
-        // return my_table_.Insert(key, value); // Adapt to your EHT API
-        static_assert(false, "Insert not implemented for USE_MY_EXTENDIBLE_HASH_TABLE yet");
-        return false; // Placeholder
+#elif defined(USE_MY_HASH_TABLE)
+        return my_table_.Insert(key, value); 
 #endif
     }
 
@@ -99,10 +98,8 @@ public:
     bool Get(const Key& key, Value& value_out) {
 #ifdef USE_LIBCUCKOO
         return table_.find(key, value_out);
-#elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
-        // return my_table_.Get(key, value_out); // Adapt to your EHT API
-        static_assert(false, "Get not implemented for USE_MY_EXTENDIBLE_HASH_TABLE yet");
-        return false; // Placeholder
+#elif defined(USE_MY_HASH_TABLE)
+        return my_table_.Get(key, value_out); 
 #endif
     }
 
@@ -115,10 +112,8 @@ public:
     bool Remove(const Key& key) {
 #ifdef USE_LIBCUCKOO
         return table_.erase(key);
-#elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
-        // return my_table_.Remove(key); // Adapt to your EHT API
-        static_assert(false, "Remove not implemented for USE_MY_EXTENDIBLE_HASH_TABLE yet");
-        return false; // Placeholder
+#elif defined(USE_MY_HASH_TABLE)
+        return my_table_.Remove(key);
 #endif
     }
 
@@ -130,9 +125,9 @@ public:
     size_t Size() const { // Marked const as it doesn't modify the table
 #ifdef USE_LIBCUCKOO
         return table_.size();
-#elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
+#elif defined(USE_MY_HASH_TABLE)
         // return my_table_.Size(); // Adapt to your EHT API
-        static_assert(false, "Size not implemented for USE_MY_EXTENDIBLE_HASH_TABLE yet");
+        // LRU_ASSERT(false, "Size not implemented for USE_MY_HASH_TABLE yet");
         return 0; // Placeholder
 #endif
     }
@@ -143,9 +138,9 @@ public:
     void Clear() {
 #ifdef USE_LIBCUCKOO
         table_.clear();
-#elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
+#elif defined(USE_MY_HASH_TABLE)
         // my_table_.Clear(); // Adapt to your EHT API
-        static_assert(false, "Clear not implemented for USE_MY_EXTENDIBLE_HASH_TABLE yet");
+        //LRU_ASSERT(false, "Clear not implemented for USE_MY_HASH_TABLE yet");
 #endif
     }
 
@@ -177,8 +172,8 @@ private:
     // The actual hash table instance
 #ifdef USE_LIBCUCKOO
     libcuckoo::cuckoohash_map<Key, Value, Hash, KeyEqual> table_;
-#elif defined(USE_MY_EXTENDIBLE_HASH_TABLE)
-    // MyExtendibleHashTable<Key, Value, Hash, KeyEqual> my_table_; // Your implementation
+#elif defined(USE_MY_HASH_TABLE)
+    MyHashTable<Key, Value, Hash, KeyEqual> my_table_;
 #endif
 
     // Note on Thread Safety:
@@ -186,7 +181,7 @@ private:
     // reads, writes, and resizes. Therefore, this wrapper, when using libcuckoo,
     // will also be thread-safe for the implemented Insert, Get, Remove, Size, Clear operations
     // without needing additional mutexes around these individual calls.
-    // If you implement USE_MY_EXTENDIBLE_HASH_TABLE, you will be responsible for
+    // If you implement USE_MY_HASH_TABLE, you will be responsible for
     // ensuring its thread safety or adding appropriate synchronization mechanisms
     // either within your extendible hash table class or in this wrapper.
 };

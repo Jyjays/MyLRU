@@ -31,7 +31,7 @@ LRUCACHE::~LRUCACHE() {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool LRUCACHE::Find(const Key& key, Value& value) {
+auto LRUCACHE::Find(const Key& key, Value& value) -> bool {
   std::unique_lock<std::mutex> lock(latch_);
   LRUNode* cur_node;
   if (!hash_table_.Get(key, cur_node)) {
@@ -44,11 +44,10 @@ bool LRUCACHE::Find(const Key& key, Value& value) {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool LRUCACHE::Insert(const Key& key, Value value) {
+auto LRUCACHE::Insert(const Key& key, Value value) -> bool {
   LRUNode* node;
   std::unique_lock<std::mutex> lock(latch_);
   if (hash_table_.Get(key, node)) {
-    // If the key already exists, update the value and move it to the head
     LRUNode* new_node = new LRUNode(key, value);
     remove_helper(key, node);
     push_node(new_node);
@@ -73,7 +72,7 @@ bool LRUCACHE::Insert(const Key& key, Value value) {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool LRUCACHE::Remove(const Key& key) {
+auto LRUCACHE::Remove(const Key& key) -> bool {
   std::unique_lock<std::mutex> lock(latch_);
   if (cur_size_ == 0) {
     return false;
@@ -86,13 +85,13 @@ bool LRUCACHE::Remove(const Key& key) {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-size_t LRUCACHE::Size() {
+auto LRUCACHE::Size() -> size_t {
   std::unique_lock<std::mutex> lock(latch_);
   return cur_size_;
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-void LRUCACHE::Clear() {
+auto LRUCACHE::Clear() -> void {
   std::unique_lock<std::mutex> lock(latch_);
   LRUNode* cur_node = head_->next_;
   while (cur_node != tail_) {
@@ -107,7 +106,7 @@ void LRUCACHE::Clear() {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-void LRUCACHE::Resize(size_t size) {
+auto LRUCACHE::Resize(size_t size) -> void {
   std::unique_lock<std::mutex> lock(latch_);
   if (size < max_size_) {
     while (cur_size_ > size) {
@@ -118,8 +117,7 @@ void LRUCACHE::Resize(size_t size) {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-void LRUCACHE::evict() {
-  // Single thread version
+auto LRUCACHE::evict() -> void {
   LRUNode* last_node = tail_->prev_;
   if (last_node == head_) {
     return;
@@ -133,9 +131,7 @@ void LRUCACHE::evict() {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-void LRUCACHE::push_node(LRUNode* node) {
-  LRU_ASSERT(node != head_ && node != tail_ && node != nullptr, "Invalid node");
-
+auto LRUCACHE::push_node(LRUNode* node) -> void {
   LRUNode* ori_first = head_->next_;
   ori_first->prev_ = node;
   node->next_ = ori_first;
@@ -144,8 +140,7 @@ void LRUCACHE::push_node(LRUNode* node) {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-void LRUCACHE::remove_node(LRUNode* node) {
-  assert(node != head_ && node != tail_ && node != nullptr);
+auto LRUCACHE::remove_node(LRUNode* node) -> void {
   LRUNode* ori_next = node->next_;
   LRUNode* ori_prev = node->prev_;
   ori_next->prev_ = ori_prev;
@@ -155,7 +150,7 @@ void LRUCACHE::remove_node(LRUNode* node) {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool LRUCACHE::remove_helper(const Key& key, LRUNode* del_node) {
+auto LRUCACHE::remove_helper(const Key& key, LRUNode* del_node) -> bool {
   remove_node(del_node);
   hash_table_.Remove(key);
   delete del_node;
@@ -175,25 +170,25 @@ SEGLRUCACHE::SegLRUCache(size_t capacity) : lru_cache_() {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool SEGLRUCACHE::Find(const Key& key, Value& value) {
+auto SEGLRUCACHE::Find(const Key& key, Value& value) -> bool {
   int32_t hash = SegHash(key);
   return lru_cache_[Shard(hash)].Find(key, value);
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool SEGLRUCACHE::Insert(const Key& key, Value value) {
+auto SEGLRUCACHE::Insert(const Key& key, Value value) -> bool {
   int32_t hash = SegHash(key);
   return lru_cache_[Shard(hash)].Insert(key, value);
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool SEGLRUCACHE::Remove(const Key& key) {
+auto SEGLRUCACHE::Remove(const Key& key) -> bool {
   int32_t hash = SegHash(key);
   return lru_cache_[Shard(hash)].Remove(key);
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-size_t SEGLRUCACHE::Size() {
+auto SEGLRUCACHE::Size() -> size_t {
   size_t total_size = 0;
   for (size_t i = 0; i < segNum; ++i) {
     total_size += lru_cache_[i].Size();
@@ -202,26 +197,26 @@ size_t SEGLRUCACHE::Size() {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-void SEGLRUCACHE::Clear() {
+auto SEGLRUCACHE::Clear() -> void {
   for (size_t i = 0; i < segNum; ++i) {
     lru_cache_[i].Clear();
   }
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-void SEGLRUCACHE::Resize(size_t size) {
+auto SEGLRUCACHE::Resize(size_t size) -> void {
   for (size_t i = 0; i < segNum; ++i) {
     lru_cache_[i].Resize(size);
   }
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-size_t SEGLRUCACHE::Capacity() {
+auto SEGLRUCACHE::Capacity() -> size_t {
   return lru_cache_[0].Capacity() * segNum;
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool SEGLRUCACHE::IsEmpty() {
+auto SEGLRUCACHE::IsEmpty() -> bool {
   for (size_t i = 0; i < segNum; ++i) {
     if (!lru_cache_[i].IsEmpty()) {
       return false;
@@ -231,7 +226,7 @@ bool SEGLRUCACHE::IsEmpty() {
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-bool SEGLRUCACHE::IsFull() {
+auto SEGLRUCACHE::IsFull() -> bool {
   for (size_t i = 0; i < segNum; ++i) {
     if (!lru_cache_[i].IsFull()) {
       return false;
