@@ -69,7 +69,8 @@ target_include_directories(mylru_tests_mt PRIVATE
 )
 
 # 为多线程测试目标添加预处理器定义
-target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
+# target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
+target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE)
 
 # 链接 Google Test 和 Pthreads
 target_link_libraries(mylru_tests_mt PRIVATE

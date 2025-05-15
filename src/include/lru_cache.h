@@ -1,3 +1,5 @@
+#pragma once
+
 #include <atomic>
 #include <mutex>
 
@@ -33,6 +35,7 @@ class LRUCache {
   LRUCache(const LRUCache&) = delete;
   LRUCache& operator=(const LRUCache&) = delete;
   ~LRUCACHE();
+  
   auto Find(const Key& key, Value& value) -> bool;
 
   auto Insert(const Key& key, Value value) -> bool;

@@ -18,45 +18,30 @@
 namespace myLru{
 
 
-
-/**
- * @brief A wrapper class for hash table implementations.
- *
- * This class provides a common interface (Insert, Get, Remove) for different
- * underlying hash table implementations. The choice of implementation can be
- * controlled via preprocessor directives (USE_LIBCUCKOO or USE_MY_HASH_TABLE).
- *
- * It is designed to be thread-safe if the underlying hash table implementation
- * (like libcuckoo) is thread-safe.
- *
- * @tparam Key The type of the keys.
- * @tparam Value The type of the values.
- * @tparam Hash The hash function for the Key (defaults to std::hash<Key>).
- * @tparam KeyEqual The equality comparison function for the Key (defaults to std::equal_to<Key>).
- */
 template <typename Key,
           typename Value,
           typename Hash = std::hash<Key>,
           typename KeyEqual = std::equal_to<Key>>
 class HashTableWrapper {
 public:
-    /**
-     * @brief Default constructor.
-     * Initializes the underlying hash table.
-     * For libcuckoo, this might involve specifying an initial capacity.
-     */
+
     HashTableWrapper() {
-        // libcuckoo::cuckoohash_map can take an initial capacity as an argument.
-        // Example: table_(1024); // Initialize with a capacity of 1024
-        // If not specified, it uses a default initial capacity.
-        // For your extendible hash table, you'll call its constructor here.
+#ifdef USE_LIBCUCKOO
+        //table_.set_num_buckets(16);
+#elif defined(USE_MY_HASH_TABLE)
+        my_table_ = MyHashTable<Key, Value, Hash, KeyEqual>(16); 
+#endif
     }
 
     /**
      * @brief Destructor.
      */
     ~HashTableWrapper() {
-        // Underlying hash table will be destructed automatically.
+#ifdef USE_LIBCUCKOO
+        table_.clear();
+#elif defined(USE_MY_HASH_TABLE)
+        my_table_.Clear();
+#endif
     }
 
     // Delete copy constructor and copy assignment operator to prevent accidental copies
@@ -126,9 +111,7 @@ public:
 #ifdef USE_LIBCUCKOO
         return table_.size();
 #elif defined(USE_MY_HASH_TABLE)
-        // return my_table_.Size(); // Adapt to your EHT API
-        // LRU_ASSERT(false, "Size not implemented for USE_MY_HASH_TABLE yet");
-        return 0; // Placeholder
+        return my_table_.Size();
 #endif
     }
 
@@ -139,8 +122,7 @@ public:
 #ifdef USE_LIBCUCKOO
         table_.clear();
 #elif defined(USE_MY_HASH_TABLE)
-        // my_table_.Clear(); // Adapt to your EHT API
-        //LRU_ASSERT(false, "Clear not implemented for USE_MY_HASH_TABLE yet");
+        my_table_.Clear();
 #endif
     }
 
@@ -186,6 +168,6 @@ private:
     // either within your extendible hash table class or in this wrapper.
 };
 
-#endif // HASHTABLE_WRAPPER_H
-
 } // namespace myLru
+
+#endif // HASHTABLE_WRAPPER_H
