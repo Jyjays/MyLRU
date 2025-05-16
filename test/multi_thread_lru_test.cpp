@@ -67,7 +67,8 @@ TEST_F(SegLRUCacheMultiThreadTest, ConcurrentInsertAndFind) {
   for (auto& t : threads) {
     t.join();
   }
-
+  cache.GetHis_Miss();
+  threads.clear();
   EXPECT_EQ(found_count.load(), num_threads * items_per_thread);
   EXPECT_EQ(
       cache.Size(),
@@ -79,7 +80,7 @@ TEST_F(SegLRUCacheMultiThreadTest, ConcurrentInsertAndFind) {
 TEST_F(SegLRUCacheMultiThreadTest, ConcurrentMixedOperations) {
   const int num_threads = 8;  // More threads for higher contention
   const int ops_per_thread = testsNum / num_threads;
-  const size_t capacity_per_segment = 100;
+  const size_t capacity_per_segment = testsNum * size_ratio / num_threads;
 
   SegLRUCache<KeyType, ValueType> cache(capacity_per_segment);
   std::vector<std::thread> threads;
@@ -139,6 +140,8 @@ TEST_F(SegLRUCacheMultiThreadTest, ConcurrentMixedOperations) {
             << successful_removes.load() << std::endl;
   std::cout << "Mixed Ops Test - Final Cache Size: " << cache.Size()
             << std::endl;
+
+  cache.GetHis_Miss();
   EXPECT_GT(successful_inserts.load(), 0);
 
 }

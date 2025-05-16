@@ -4,8 +4,8 @@
 #include <mutex>
 
 #include "config.h"
+#include "hash_table_resizer.h"
 #include "hashtable_wrapper.h"
-
 namespace myLru {
 
 // #define OutOfListMarker ((void*)0x1)
@@ -30,12 +30,15 @@ class LRUCache {
     Key key_;
     Value value_;
   };
+
+  using ResizerType = HashTableResizer<Key, LRUNode*, Hash, KeyEqual>;
+
   LRUCache();
   LRUCache(size_t size);
   LRUCache(const LRUCache&) = delete;
   LRUCache& operator=(const LRUCache&) = delete;
   ~LRUCACHE();
-  
+
   auto Find(const Key& key, Value& value) -> bool;
 
   auto Insert(const Key& key, Value value) -> bool;
@@ -48,6 +51,10 @@ class LRUCache {
   auto IsEmpty() -> bool { return cur_size_ == 0; }
   auto Capacity() -> size_t { return max_size_; }
   auto IsFull() -> bool { return cur_size_ == max_size_; }
+
+  auto SetResizer(ResizerType* resizer) -> void {
+    hash_table_.SetResizer(resizer);
+  }
 
  private:
   HashTableWrapper<Key, LRUNode*, Hash, KeyEqual> hash_table_;
@@ -70,6 +77,8 @@ template <typename Key, typename Value, typename Hash = std::hash<Key>,
           typename KeyEqual = std::equal_to<Key>>
 class SegLRUCache {
  public:
+  using ShardType = LRUCache<Key, Value, Hash, KeyEqual>;
+  using ResizerForShardsType = typename ShardType::ResizerType;
   explicit SegLRUCache(size_t capacity);
   auto Find(const Key& key, Value& value) -> bool;
   auto Insert(const Key& key, Value value) -> bool;
@@ -80,9 +89,16 @@ class SegLRUCache {
   auto Capacity() -> size_t;
   auto IsEmpty() -> bool;
   auto IsFull() -> bool;
+  auto GetHis_Miss() -> void;
 
  private:
   LRUCACHE lru_cache_[segNum];
+
+  std::atomic<size_t> hit_count_ = 0;
+  std::atomic<size_t> miss_count_ = 0;
+
+  ResizerForShardsType resizer_;
+
   static auto Shard(size_t hash) -> uint32_t {
     return static_cast<uint32_t>(hash & (segNum - 1));
   }

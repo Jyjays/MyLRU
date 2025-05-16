@@ -166,13 +166,20 @@ LRUCACHE_TEMPLATE_ARGUMENTS
 SEGLRUCACHE::SegLRUCache(size_t capacity) : lru_cache_() {
   for (size_t i = 0; i < segNum; ++i) {
     lru_cache_[i].Resize(capacity);
+    lru_cache_[i].SetResizer(&resizer_);
   }
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
 auto SEGLRUCACHE::Find(const Key& key, Value& value) -> bool {
   int32_t hash = SegHash(key);
-  return lru_cache_[Shard(hash)].Find(key, value);
+  if (lru_cache_[Shard(hash)].Find(key, value)) {
+    hit_count_++;
+    return true;
+  } else {
+    miss_count_++;
+    return false;
+  }
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
@@ -233,6 +240,14 @@ auto SEGLRUCACHE::IsFull() -> bool {
     }
   }
   return true;
+}
+
+LRUCACHE_TEMPLATE_ARGUMENTS
+auto SEGLRUCACHE::GetHis_Miss() -> void {
+  printf("Hit Ratio: %.2f%%\n",
+         static_cast<double>(hit_count_) / (hit_count_ + miss_count_) * 100);
+  printf("Miss Ratio: %.2f%%\n",
+         static_cast<double>(miss_count_) / (hit_count_ + miss_count_) * 100);
 }
 
 template class LRUCache<KeyType, ValueType, HashType, KeyEqualType>;
