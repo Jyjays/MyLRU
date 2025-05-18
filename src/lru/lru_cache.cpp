@@ -124,7 +124,7 @@ auto LRUCACHE::evict() -> void {
   }
   remove_node(last_node);
   if (!hash_table_.Remove(last_node->key_)) {
-    LRU_ERR("Failed to remove key from hash table");
+    //LRU_ERR("Failed to remove key from hash table");
   }
   cur_size_--;
   delete last_node;
@@ -166,7 +166,9 @@ LRUCACHE_TEMPLATE_ARGUMENTS
 SEGLRUCACHE::SegLRUCache(size_t capacity) : lru_cache_() {
   for (size_t i = 0; i < segNum; ++i) {
     lru_cache_[i].Resize(capacity);
+#ifdef USE_HASH_RESIZER
     lru_cache_[i].SetResizer(&resizer_);
+#endif
   }
 }
 

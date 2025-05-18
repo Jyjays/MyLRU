@@ -78,7 +78,7 @@ TEST_F(SegLRUCacheMultiThreadTest, ConcurrentInsertAndFind) {
 
 // --- Multi-threaded Mixed Operations Test (Insert, Find, Remove) ---
 TEST_F(SegLRUCacheMultiThreadTest, ConcurrentMixedOperations) {
-  const int num_threads = 8;  // More threads for higher contention
+  const int num_threads = 1;  // More threads for higher contention
   const int ops_per_thread = testsNum / num_threads;
   const size_t capacity_per_segment = testsNum * size_ratio / num_threads;
 

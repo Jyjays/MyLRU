@@ -8,7 +8,8 @@
 #include "hashtable_wrapper.h"
 namespace myLru {
 
-// #define OutOfListMarker ((void*)0x1)
+
+
 
 #define LRUCACHE_TEMPLATE_ARGUMENTS \
   template <typename Key, typename Value, typename Hash, typename KeyEqual>
@@ -17,7 +18,7 @@ namespace myLru {
 
 #define SEGLRUCACHE SegLRUCache<Key, Value, Hash, KeyEqual>
 
-template <typename Key, typename Value, typename Hash = std::hash<Key>,
+template <typename Key, typename Value, typename Hash = HashFuncImplement,
           typename KeyEqual = std::equal_to<Key>>
 class LRUCache {
  public:
@@ -73,7 +74,7 @@ class LRUCache {
   auto remove_helper(const Key& key, LRUNode* del_node) -> bool;
 };
 
-template <typename Key, typename Value, typename Hash = std::hash<Key>,
+template <typename Key, typename Value, typename Hash = HashFuncImplement,
           typename KeyEqual = std::equal_to<Key>>
 class SegLRUCache {
  public:
@@ -104,7 +105,7 @@ class SegLRUCache {
   }
 
   static auto SegHash(const Key& key) -> size_t {
-    return std::hash<KeyType>()(key);
+    return Hash()(key);
   }
 };
 

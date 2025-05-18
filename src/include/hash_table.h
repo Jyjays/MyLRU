@@ -6,20 +6,22 @@
 #include <utility>
 #include <vector>
 
+#include "config.h"
+
 namespace myLru {
 
-template <typename K, typename V, typename HF = std::hash<K>,
+template <typename K, typename V, typename HF = HashFuncImplement,
           typename KEF = std::equal_to<K>>
 class HashTableResizer;
 
-template <typename Key, typename Value, typename HashFunc = std::hash<Key>,
+template <typename Key, typename Value, typename HashFunc = HashFuncImplement,
           typename KeyEqualFunc = std::equal_to<Key>>
 class MyHashTable {
  public:
   using HashTableResizerType =
       HashTableResizer<Key, Value, HashFunc, KeyEqualFunc>;
 
-  explicit MyHashTable(size_t initial_buckets = 16) : elems_(0) {
+  explicit MyHashTable(size_t initial_buckets = 16) : elems_(0){
     if (initial_buckets == 0) {
       initial_buckets = 1;
     }
@@ -41,6 +43,7 @@ class MyHashTable {
   }
 
   auto Insert(const Key& key, Value value_to_insert) -> bool {
+    std::unique_lock<std::mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
     std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
 
@@ -52,7 +55,7 @@ class MyHashTable {
     }
     if (resizing_) {
       // If resizing, check in the temp list
-      size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_.size());
+      size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_size);
       std::vector<std::pair<Key, Value>>& temp_chain =
           temp_list_[temp_bucket_idx];
       for (auto& pair_entry : temp_chain) {
@@ -62,17 +65,19 @@ class MyHashTable {
         }
       }
       // If not found, insert into the temp list.
-      std::lock_guard<std::mutex> lock(latch_);
       temp_chain.emplace_back(key, value_to_insert);
       return true;
     } else {
       chain.emplace_back(key, value_to_insert);
+      elems_++;
     }
-
-    elems_++;
-    if (elems_ > length_) {
+    lock.unlock();
+    // When the number of elements is more than 2 times the length,
+    // we need to resize the hash table.
+    if (elems_ > 2 * length_) {
       if (resizer_ != nullptr) {
         resizing_ = true;
+        initialize_temp_list();
         resizer_->EnqueueResize(this);
       } else {
         Resize();
@@ -82,22 +87,28 @@ class MyHashTable {
   }
 
   auto Remove(const Key& key) -> bool {
+    std::unique_lock<std::mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
     std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
     if (resizing_) {
-      std::lock_guard<std::mutex> lock(latch_);
-      size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_.size());
+      // std::lock_guard<std::mutex> lock(latch_);
+      size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_size);
       std::vector<std::pair<Key, Value>>& temp_chain =
           temp_list_[temp_bucket_idx];
-      for (auto iter = temp_chain.begin(); iter != temp_chain.end(); ++iter) {
-        if (key_equal_(iter->first, key)) {
-          temp_chain.erase(iter);
+      for (auto& entry : temp_chain) {
+        if (key_equal_(entry.first, key)) {
+          temp_chain.erase(
+              std::remove(temp_chain.begin(), temp_chain.end(), entry),
+              temp_chain.end());
+          elems_--;
+          return true;
         }
       }
     }
-    for (auto iter = chain.begin(); iter != chain.end(); ++iter) {
-      if (key_equal_(iter->first, key)) {
-        chain.erase(iter);  // 从链中移除
+    for (auto& entry : chain) {
+      if (key_equal_(entry.first, key)) {
+        chain.erase(std::remove(chain.begin(), chain.end(), entry),
+                    chain.end());
         elems_--;
         return true;
       }
@@ -106,39 +117,37 @@ class MyHashTable {
   }
 
   auto Resize() -> void {
-    size_t old_length = length_;
-    length_ <<= 1;
+    size_t new_length_ = length_ << 1;
+    std::vector<std::vector<std::pair<Key, Value>>> new_list(new_length_);
+    // Copy the old elements to the new list
+    for (size_t i = 0; i < length_; i++) {
+      std::vector<std::pair<Key, Value>>& chain = list_[i];
 
-    // Avoid overflow
-    if (length_ == 0) {
-      length_ = old_length > 0 ? old_length * 2 : 16;
-      if (length_ == 0) length_ = SIZE_MAX / 2 + 1;
-    }
-
-    std::vector<std::vector<std::pair<Key, Value>>> new_list(length_);
-    elems_ = 0;
-
-    for (size_t i = 0; i < old_length; ++i) {
-      for (const auto& pair_entry : list_[i]) {
-        size_t new_bucket_idx = GetBucketIndexInternal(
-            pair_entry.first, length_);  // 使用新的 length_
-        new_list[new_bucket_idx].emplace_back(pair_entry.first,
-                                              pair_entry.second);
-        elems_++;
-      }
-    }
-    list_ = std::move(new_list);
-    // Now we need to move the temp_list_ to the new list
-    std::lock_guard<std::mutex> lock(latch_);
-    for (size_t i = 0; i < temp_list_.size(); ++i) {
-      for (const auto& pair_entry : temp_list_[i]) {
+      for (auto& entry : chain) {
         size_t new_bucket_idx =
-            GetBucketIndexInternal(pair_entry.first, length_);
-        list_[new_bucket_idx].emplace_back(pair_entry.first, pair_entry.second);
-        elems_++;
+            GetBucketIndexInternal(entry.first, new_length_);
+        new_list[new_bucket_idx].emplace_back(entry.first, entry.second);
       }
     }
+    std::lock_guard<std::mutex> lock(read_latch_);
+    list_ = std::move(new_list);
+    length_ = new_length_;
     resizing_ = false;
+    // Insert the elements from the temp list to new list
+    // std::lock_guard<std::mutex> lock(latch_);
+    if (temp_list_.empty() || resizer_ == nullptr) {
+      return;
+    }
+    for (size_t i = 0; i < temp_list_size; i++) {
+      auto& temp_chain = temp_list_[i];
+      for (auto& entry : temp_chain) {
+        size_t new_bucket_idx =
+            GetBucketIndexInternal(entry.first, new_length_);
+        list_[new_bucket_idx].emplace_back(entry.first, entry.second);
+      }
+    }
+    // Clear the temp list after the resizing set to false
+    temp_list_.clear();
   }
 
   auto SetSize(size_t size) -> void {
@@ -167,6 +176,8 @@ class MyHashTable {
  private:
   // The actual hash table
   std::vector<std::vector<std::pair<Key, Value>>> list_;
+  // Mutex for list_
+  std::mutex read_latch_;
   // The number of buckets in the hash table
   size_t length_;
   // The number of elements in the hash table
@@ -174,7 +185,7 @@ class MyHashTable {
   // Temporary list for resizing
   std::vector<std::vector<std::pair<Key, Value>>> temp_list_;
   // Mutex for temp_list_
-  std::mutex latch_;
+  //std::mutex latch_;
   // Hash function
   HashFunc hash_function_;
   // Key equality function
@@ -183,6 +194,8 @@ class MyHashTable {
   HashTableResizerType* resizer_ = nullptr;
   // Flag to indicate if resizing is in progress
   std::atomic<bool> resizing_ = false;
+  // The size of the temporary list
+  static const size_t temp_list_size = 8;
 
   auto GetBucketIndex(const Key& key) const -> size_t {
     return hash_function_(key) & (length_ - 1);
@@ -194,6 +207,7 @@ class MyHashTable {
   }
 
   auto FindValuePtr(const Key& key) -> Value* {
+    std::unique_lock<std::mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
     std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
 
@@ -203,7 +217,7 @@ class MyHashTable {
       }
     }
     if (resizing_) {
-      size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_.size());
+      size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_size);
       std::vector<std::pair<Key, Value>>& temp_chain =
           temp_list_[temp_bucket_idx];
 
@@ -214,6 +228,10 @@ class MyHashTable {
       }
     }
     return nullptr;
+  }
+
+  inline auto initialize_temp_list() -> void {
+    temp_list_.resize(temp_list_size);
   }
 };
 
