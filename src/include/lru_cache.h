@@ -8,9 +8,6 @@
 #include "hashtable_wrapper.h"
 namespace myLru {
 
-
-
-
 #define LRUCACHE_TEMPLATE_ARGUMENTS \
   template <typename Key, typename Value, typename Hash, typename KeyEqual>
 
@@ -63,7 +60,7 @@ class LRUCache {
   LRUNode* tail_;
   std::mutex latch_;
   size_t max_size_;
-  std::atomic<size_t> cur_size_;
+  size_t cur_size_;
 
   auto evict() -> void;
 

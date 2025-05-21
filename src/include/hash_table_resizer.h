@@ -12,6 +12,8 @@
 
 namespace myLru {
 
+#define DEFAULT_NUM_THREADS 1
+
 template <typename Key, typename Value, typename HashFunc,
           typename KeyEqualFunc>
 class HashTableResizer {
@@ -19,18 +21,27 @@ class HashTableResizer {
   using HashTableType = MyHashTable<Key, Value, HashFunc, KeyEqualFunc>;
 
   HashTableResizer() : stop_requested_(false) {
-    resize_thread_ = std::thread(&HashTableResizer::ResizeThread, this);
+    //resize_thread_ = std::thread(&HashTableResizer::ResizeThread, this);
+    printf("HashTableResizer: %d threads\n", DEFAULT_NUM_THREADS);
+    for (int i = 0; i < DEFAULT_NUM_THREADS; ++i) {
+      threads_.emplace_back(&HashTableResizer::ResizeThread, this);
+    }
+  }
+
+  HashTableResizer(int size) : stop_requested_(false) {
+    for (int i = 0; i < size; ++i) {
+      threads_.emplace_back(&HashTableResizer::ResizeThread, this);
+    }
   }
 
   ~HashTableResizer() {
     {
       std::unique_lock<std::mutex> lock(latch_);
-      stop_requested_ = true;  // Signal the thread to stop
+      stop_requested_ = true;  
     }
-    cv_.notify_one();  // Wake up the thread if it's waiting
-
-    if (resize_thread_.has_value() && resize_thread_->joinable()) {
-      resize_thread_->join();  // Wait for the thread to finish
+    cv_.notify_all(); 
+    for (auto &thread: threads_) {
+      thread.join();
     }
   }
 
@@ -39,11 +50,10 @@ class HashTableResizer {
   HashTableResizer& operator=(const HashTableResizer&) = delete;
 
   void EnqueueResize(HashTableType* table) {
-    if (table == nullptr) return;  // Do not enqueue null pointers
-
+    if (table == nullptr) return; 
     std::unique_lock<std::mutex> lock(latch_);
     resize_queue_.push(table);
-    cv_.notify_one();  // Notify the resize thread that a new task is available
+    cv_.notify_one();
   }
 
  private:
@@ -79,10 +89,12 @@ class HashTableResizer {
   std::mutex latch_;
   // Store raw pointers to MyHashTable instances that need resizing
   std::queue<HashTableType*> resize_queue_;
+  // Condition variable to notify threads
   std::condition_variable cv_;
-  std::atomic<bool> stop_requested_;  // Flag to signal the thread to stop
-
-  std::optional<std::thread> resize_thread_;
+  // Flag to signal the thread to stop
+  std::atomic<bool> stop_requested_;  
+  // std::optional<std::thread> resize_thread_;
+  std::vector<std::thread> threads_;
 };
 
 }  // namespace myLru

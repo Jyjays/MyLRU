@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 
-#define USE_HASH_RESIZER
+//#define USE_HASH_RESIZER
 
 
 
@@ -18,16 +18,17 @@ static const double size_ratio = 0.1;
 
 struct HashFuncImplement {
   size_t operator()(int64_t key) const noexcept {
-    uint64_t x = static_cast<uint64_t>(key);
+    // uint64_t x = static_cast<uint64_t>(key);
 
-    // MurmurHash3 finalizer-like mixing (or FNV-1a inspired)
-    x ^= (x >> 33);
-    x *= 0xff51afd7ed558ccdULL;
-    x ^= (x >> 33);
-    x *= 0xc4ceb9fe1a85ec53ULL;
-    x ^= (x >> 33);
+    // // MurmurHash3 finalizer-like mixing (or FNV-1a inspired)
+    // x ^= (x >> 33);
+    // x *= 0xff51afd7ed558ccdULL;
+    // x ^= (x >> 33);
+    // x *= 0xc4ceb9fe1a85ec53ULL;
+    // x ^= (x >> 33);
 
-    return static_cast<size_t>(x);
+    // return static_cast<size_t>(x);
+    return std::hash<int64_t>()(key);
   }
 };
 
