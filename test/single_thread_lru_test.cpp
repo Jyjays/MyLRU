@@ -16,17 +16,8 @@ ValueType generateValueForKey(KeyType key) {
 
 namespace myLru {  // Using your namespace
 
-// --- Test Fixture (Optional but good practice) ---
-// Can be used to set up common objects for tests.
-class LRUCacheSingleThreadTest : public ::testing::Test {
- protected:
-  // You can define members common to tests here, e.g., a cache instance.
-  // void SetUp() override { /* Code here will be called before each test */ }
-  // void TearDown() override { /* Code here will be called after each test */ }
-};
-
 // --- Basic Insert, Find, Remove Test ---
-TEST_F(LRUCacheSingleThreadTest, BasicOperations) {
+TEST(LRUCacheSingleThreadTest, BasicOperations) {
   const size_t capacity = 100;
   LRUCache<KeyType, ValueType> cache(capacity);
   ValueType retrieved_value;
@@ -38,18 +29,14 @@ TEST_F(LRUCacheSingleThreadTest, BasicOperations) {
   // 1. Insert elements
   for (KeyType i = 0; i < static_cast<KeyType>(capacity); ++i) {
     ValueType expected_value = generateValueForKey(i);
-    // Use ASSERT_TRUE because subsequent operations depend on successful
-    // insertion.
     ASSERT_TRUE(cache.Insert(i, expected_value))
         << "Failed to insert key " << i;
     EXPECT_EQ(cache.Size(), static_cast<size_t>(i + 1));
     EXPECT_FALSE(cache.IsEmpty());
   }
   EXPECT_EQ(cache.Size(), capacity);
-  EXPECT_TRUE(cache.IsFull());  // Cache should now be full
+  EXPECT_TRUE(cache.IsFull());
 
-  // 2. Find elements (verify values and LRU order - implicitly tested by
-  // finding all)
   for (KeyType i = 0; i < static_cast<KeyType>(capacity); ++i) {
     ValueType expected_value = generateValueForKey(i);
     ASSERT_TRUE(cache.Find(i, retrieved_value)) << "Failed to find key " << i;
@@ -58,14 +45,12 @@ TEST_F(LRUCacheSingleThreadTest, BasicOperations) {
   }
 
   // 3. Try to find a non-existent key
-  EXPECT_FALSE(cache.Find(capacity + 1,
-                          retrieved_value));  // Key outside the inserted range
+  EXPECT_FALSE(cache.Find(capacity + 1, retrieved_value));
 
   // 4. Remove elements
   for (KeyType i = 0; i < static_cast<KeyType>(capacity); ++i) {
     ASSERT_TRUE(cache.Remove(i)) << "Failed to remove key " << i;
     EXPECT_EQ(cache.Size(), capacity - 1 - i);
-    // Verify it's actually removed
     EXPECT_FALSE(cache.Find(i, retrieved_value))
         << "Found key " << i << " after removal.";
   }
@@ -73,12 +58,12 @@ TEST_F(LRUCacheSingleThreadTest, BasicOperations) {
   EXPECT_TRUE(cache.IsEmpty());
 
   // 5. Try removing a non-existent key
-  EXPECT_FALSE(cache.Remove(0));             // Key 0 was already removed
-  EXPECT_FALSE(cache.Remove(capacity + 1));  // Key never existed
+  EXPECT_FALSE(cache.Remove(0));
+  EXPECT_FALSE(cache.Remove(capacity + 1));
 }
 
 // --- Test Cache Eviction Policy (LRU) ---
-TEST_F(LRUCacheSingleThreadTest, EvictionLRU) {
+TEST(LRUCacheSingleThreadTest, EvictionLRU) {
   const size_t capacity = 10;
   LRUCache<KeyType, ValueType> cache(capacity);
   ValueType retrieved_value;
@@ -94,7 +79,7 @@ TEST_F(LRUCacheSingleThreadTest, EvictionLRU) {
   // 0)
   KeyType new_key = capacity;
   ASSERT_TRUE(cache.Insert(new_key, generateValueForKey(new_key)));
-  EXPECT_EQ(cache.Size(), capacity);  // Size should remain at capacity
+  EXPECT_EQ(cache.Size(), capacity);
 
   // 3. Verify the evicted element (key 0) is gone
   EXPECT_FALSE(cache.Find(0, retrieved_value))
@@ -113,7 +98,7 @@ TEST_F(LRUCacheSingleThreadTest, EvictionLRU) {
 }
 
 // --- Test Updating Existing Key ---
-TEST_F(LRUCacheSingleThreadTest, UpdateValueAndLRUOrder) {
+TEST(LRUCacheSingleThreadTest, UpdateValueAndLRUOrder) {
   const size_t capacity = 5;
   LRUCache<KeyType, ValueType> cache(capacity);
   ValueType retrieved_value;
@@ -126,18 +111,17 @@ TEST_F(LRUCacheSingleThreadTest, UpdateValueAndLRUOrder) {
   // 2. Update key 0 - should change its value and make it the most recently
   // used
   KeyType key_to_update = 0;
-  ValueType updated_value = generateValueForKey(99);  // A distinct value
+  ValueType updated_value = generateValueForKey(99);
   ASSERT_TRUE(cache.Insert(key_to_update, updated_value));
-  EXPECT_EQ(cache.Size(), capacity);  // Size should not change
+  EXPECT_EQ(cache.Size(), capacity);
 
   // 3. Verify the updated value
   ASSERT_TRUE(cache.Find(key_to_update, retrieved_value));
   EXPECT_EQ(retrieved_value, updated_value);
 
   // 4. Insert new elements to force eviction (Keys 5, 6)
-  // Since key 0 is now the MRU, keys 1 and 2 should be evicted.
-  ASSERT_TRUE(cache.Insert(5, generateValueForKey(5)));  // Evicts key 1
-  ASSERT_TRUE(cache.Insert(6, generateValueForKey(6)));  // Evicts key 2
+  ASSERT_TRUE(cache.Insert(5, generateValueForKey(5)));
+  ASSERT_TRUE(cache.Insert(6, generateValueForKey(6)));
 
   EXPECT_EQ(cache.Size(), capacity);
 
@@ -146,7 +130,7 @@ TEST_F(LRUCacheSingleThreadTest, UpdateValueAndLRUOrder) {
   EXPECT_FALSE(cache.Find(2, retrieved_value)) << "Key 2 should be evicted.";
 
   // 6. Verify remaining keys are present (0, 3, 4, 5, 6)
-  EXPECT_TRUE(cache.Find(0, retrieved_value));  // Updated key 0 is still here
+  EXPECT_TRUE(cache.Find(0, retrieved_value));
   EXPECT_TRUE(cache.Find(3, retrieved_value));
   EXPECT_TRUE(cache.Find(4, retrieved_value));
   EXPECT_TRUE(cache.Find(5, retrieved_value));
@@ -154,7 +138,7 @@ TEST_F(LRUCacheSingleThreadTest, UpdateValueAndLRUOrder) {
 }
 
 // --- Test LRU Order Change by Access ---
-TEST_F(LRUCacheSingleThreadTest, EvictionAfterAccessOrderChange) {
+TEST(LRUCacheSingleThreadTest, EvictionAfterAccessOrderChange) {
   const size_t capacity = 5;
   LRUCache<KeyType, ValueType> cache(capacity);
   ValueType retrieved_value;
@@ -165,12 +149,9 @@ TEST_F(LRUCacheSingleThreadTest, EvictionAfterAccessOrderChange) {
   }
 
   // 2. Access elements in a specific order to change LRU status
-  ASSERT_TRUE(cache.Find(
-      0, retrieved_value));  // Access 0 -> Order: 0 (MRU), 4, 3, 2, 1 (LRU)
-  ASSERT_TRUE(cache.Find(
-      1, retrieved_value));  // Access 1 -> Order: 1 (MRU), 0, 4, 3, 2 (LRU)
-  ASSERT_TRUE(cache.Find(
-      2, retrieved_value));  // Access 2 -> Order: 2 (MRU), 1, 0, 4, 3 (LRU)
+  ASSERT_TRUE(cache.Find(0, retrieved_value));
+  ASSERT_TRUE(cache.Find(1, retrieved_value));
+  ASSERT_TRUE(cache.Find(2, retrieved_value));
 
   // 3. Insert a new element (Key 5) - should evict the current LRU (Key 3)
   ASSERT_TRUE(cache.Insert(5, generateValueForKey(5)));
@@ -188,7 +169,7 @@ TEST_F(LRUCacheSingleThreadTest, EvictionAfterAccessOrderChange) {
 }
 
 // --- Test Clear Operation ---
-TEST_F(LRUCacheSingleThreadTest, ClearCache) {
+TEST(LRUCacheSingleThreadTest, ClearCache) {
   const size_t capacity = 10;
   LRUCache<KeyType, ValueType> cache(capacity);
   ValueType retrieved_value;
@@ -203,7 +184,7 @@ TEST_F(LRUCacheSingleThreadTest, ClearCache) {
   cache.Clear();
   EXPECT_EQ(cache.Size(), 0);
   EXPECT_TRUE(cache.IsEmpty());
-  EXPECT_FALSE(cache.IsFull());  // Should not be full after clear
+  EXPECT_FALSE(cache.IsFull());
 
   // 3. Verify elements are gone
   for (KeyType i = 0; i < static_cast<KeyType>(capacity / 2); ++i) {
@@ -219,7 +200,7 @@ TEST_F(LRUCacheSingleThreadTest, ClearCache) {
 }
 
 // --- Test Edge Case: Capacity 1 ---
-TEST_F(LRUCacheSingleThreadTest, CapacityOne) {
+TEST(LRUCacheSingleThreadTest, CapacityOne) {
   LRUCache<KeyType, ValueType> cache(1);
   ValueType retrieved_value;
 
@@ -234,12 +215,11 @@ TEST_F(LRUCacheSingleThreadTest, CapacityOne) {
   // Insert second element, should evict the first
   ASSERT_TRUE(cache.Insert(2, generateValueForKey(2)));
   EXPECT_EQ(cache.Size(), 1);
-  EXPECT_FALSE(cache.Find(1, retrieved_value));  // Key 1 should be gone
+  EXPECT_FALSE(cache.Find(1, retrieved_value));
   ASSERT_TRUE(cache.Find(2, retrieved_value));
   EXPECT_EQ(retrieved_value, generateValueForKey(2));
 
-  // Update the only element
-  ASSERT_TRUE(cache.Insert(2, generateValueForKey(99)));
+  ASSERT_FALSE(cache.Insert(2, generateValueForKey(99)));
   EXPECT_EQ(cache.Size(), 1);
   ASSERT_TRUE(cache.Find(2, retrieved_value));
   EXPECT_EQ(retrieved_value, generateValueForKey(99));

@@ -8,16 +8,20 @@
 #include "hashtable_wrapper.h"
 namespace myLru {
 
-#define LRUCACHE_TEMPLATE_ARGUMENTS \
+#define LRUCACHEHT_TEMPLATE_ARGUMENTS \
   template <typename Key, typename Value, typename Hash, typename KeyEqual>
 
-#define LRUCACHE LRUCache<Key, Value, Hash, KeyEqual>
+#define LRUCACHEHT LRUCacheHT<Key, Value, Hash, KeyEqual>
 
-#define SEGLRUCACHE SegLRUCache<Key, Value, Hash, KeyEqual>
+#define SEGLRUCACHEHT SegLRUCacheHT<Key, Value, Hash, KeyEqual>
+
+/**
+ * @brief LRUCacheHT 的并发策略是哈希表靠自身保证并发安全，链表靠外部锁
+ */
 
 template <typename Key, typename Value, typename Hash = HashFuncImplement,
           typename KeyEqual = std::equal_to<Key>>
-class LRUCache {
+class LRUCacheHT {
  public:
   struct LRUNode {
     LRUNode() : next_(nullptr), prev_(nullptr) {}
@@ -31,11 +35,11 @@ class LRUCache {
 
   using ResizerType = HashTableResizer<Key, LRUNode*, Hash, KeyEqual>;
 
-  LRUCache();
-  LRUCache(size_t size);
-  LRUCache(const LRUCache&) = delete;
-  LRUCache& operator=(const LRUCache&) = delete;
-  ~LRUCache();
+  LRUCacheHT();
+  LRUCacheHT(size_t size);
+  LRUCacheHT(const LRUCacheHT&) = delete;
+  LRUCacheHT& operator=(const LRUCacheHT&) = delete;
+  ~LRUCacheHT();
 
   auto Find(const Key& key, Value& value) -> bool;
 
@@ -73,11 +77,11 @@ class LRUCache {
 
 template <typename Key, typename Value, typename Hash = HashFuncImplement,
           typename KeyEqual = std::equal_to<Key>>
-class SegLRUCache {
+class SegLRUCacheHT {
  public:
-  using ShardType = LRUCache<Key, Value, Hash, KeyEqual>;
+  using ShardType = LRUCacheHT<Key, Value, Hash, KeyEqual>;
   using ResizerForShardsType = typename ShardType::ResizerType;
-  explicit SegLRUCache(size_t capacity);
+  explicit SegLRUCacheHT(size_t capacity);
   auto Find(const Key& key, Value& value) -> bool;
   auto Insert(const Key& key, Value value) -> bool;
   auto Remove(const Key& key) -> bool;
@@ -90,10 +94,10 @@ class SegLRUCache {
   auto GetHis_Miss() -> void;
 
  private:
-  LRUCACHE lru_cache_[segNum];
+  LRUCACHEHT lru_cache_[segNum];
 
-  // std::atomic<size_t> hit_count_ = 0;
-  // std::atomic<size_t> miss_count_ = 0;
+  std::atomic<size_t> hit_count_ = 0;
+  std::atomic<size_t> miss_count_ = 0;
 
   ResizerForShardsType resizer_;
 

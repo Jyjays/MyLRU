@@ -4,14 +4,14 @@
 #include <iostream>
 #include <string>
 
-//#define USE_HASH_RESIZER
+#define USE_HASH_RESIZER
 
 
 
 static const int kNumSegBits = 4;
 static const int segNum = 1 << kNumSegBits;
 
-static const int threadNum = 8;
+static const int threadNum = 4;
 static const int testsNum = 1000000;
 
 static const double size_ratio = 0.1;
@@ -43,9 +43,11 @@ using KeyEqualType = std::equal_to<KeyType>;
     exit(EXIT_FAILURE);                         \
   } while (0)
 #define LRU_ASSERT(cond, msg)                                \
+  \
   do {                                                       \
     if (!(cond)) {                                           \
       std::cerr << "Assertion failed: " << msg << std::endl; \
       exit(EXIT_FAILURE);                                    \
     }                                                        \
   } while (0)
+

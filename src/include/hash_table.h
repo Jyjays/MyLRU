@@ -21,7 +21,7 @@ class MyHashTable {
   using HashTableResizerType =
       HashTableResizer<Key, Value, HashFunc, KeyEqualFunc>;
 
-  explicit MyHashTable(size_t initial_buckets = 16) : elems_(0){
+  explicit MyHashTable(size_t initial_buckets = 16) : elems_(0) {
     if (initial_buckets == 0) {
       initial_buckets = 1;
     }
@@ -49,8 +49,10 @@ class MyHashTable {
 
     for (auto& pair_entry : chain) {
       if (key_equal_(pair_entry.first, key)) {
-        pair_entry.second = value_to_insert;
-        return true;
+        // pair_entry.second = value_to_insert;
+        // return true;
+        // Not allow to update the value
+        return false;
       }
     }
     if (resizing_) {
@@ -60,8 +62,7 @@ class MyHashTable {
           temp_list_[temp_bucket_idx];
       for (auto& pair_entry : temp_chain) {
         if (key_equal_(pair_entry.first, key)) {
-          pair_entry.second = value_to_insert;
-          return true;
+          return false;
         }
       }
       // If not found, insert into the temp list.
@@ -71,7 +72,7 @@ class MyHashTable {
       chain.emplace_back(key, value_to_insert);
       elems_++;
     }
-    lock.unlock();
+    // lock.unlock();
     // When the number of elements is more than 2 times the length,
     // we need to resize the hash table.
     if (elems_ > 2 * length_) {
@@ -80,6 +81,7 @@ class MyHashTable {
         initialize_temp_list();
         resizer_->EnqueueResize(this);
       } else {
+        lock.unlock();
         Resize();
       }
     }
@@ -89,7 +91,7 @@ class MyHashTable {
   auto Remove(const Key& key) -> bool {
     std::unique_lock<std::mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
-    std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
+
     if (resizing_) {
       // std::lock_guard<std::mutex> lock(latch_);
       size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_size);
@@ -105,6 +107,7 @@ class MyHashTable {
         }
       }
     }
+    std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
     for (auto& entry : chain) {
       if (key_equal_(entry.first, key)) {
         chain.erase(std::remove(chain.begin(), chain.end(), entry),
@@ -185,7 +188,7 @@ class MyHashTable {
   // Temporary list for resizing
   std::vector<std::vector<std::pair<Key, Value>>> temp_list_;
   // Mutex for temp_list_
-  //std::mutex latch_;
+  // std::mutex latch_;
   // Hash function
   HashFunc hash_function_;
   // Key equality function

@@ -6,6 +6,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# --- ASan (AddressSanitizer) 配置 ---
+option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+
+if(ENABLE_ASAN)
+    message(STATUS "AddressSanitizer (ASan) is enabled.")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options("-g" "-fsanitize=address")
+        add_link_options("-fsanitize=address")
+    else()
+        message(WARNING "ASan is enabled but the current compiler (${CMAKE_CXX_COMPILER_ID}) might not support -fsanitize=address directly through these flags.")
+    endif()
+else()
+    message(STATUS "AddressSanitizer (ASan) is disabled.")
+endif()
+# --- ASan 配置结束 --- 
+
 # 添加 libcuckoo（如果它的 CMakeLists.txt 需要）
 add_subdirectory(third_party/libcuckoo)
 
@@ -35,6 +51,7 @@ add_subdirectory(third_party/googletest)
 add_executable(mylru_tests
     test/single_thread_lru_test.cpp
     src/lru/lru_cache.cpp 
+    src/lru/lru_cache_ht.cpp
 )
 
 # 为单线程测试目标添加包含目录
@@ -60,6 +77,7 @@ target_link_libraries(mylru_tests PRIVATE
 add_executable(mylru_tests_mt
     test/multi_thread_lru_test.cpp
     src/lru/lru_cache.cpp 
+    src/lru/lru_cache_ht.cpp
 )
 
 # 为多线程测试目标添加包含目录
@@ -70,8 +88,8 @@ target_include_directories(mylru_tests_mt PRIVATE
 )
 
 # 为多线程测试目标添加预处理器定义
-# target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
-target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE)
+target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
+# target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE)
 
 # 链接 Google Test 和 Pthreads
 target_link_libraries(mylru_tests_mt PRIVATE
