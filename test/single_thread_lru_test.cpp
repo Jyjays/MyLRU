@@ -219,7 +219,7 @@ TEST(LRUCacheSingleThreadTest, CapacityOne) {
   ASSERT_TRUE(cache.Find(2, retrieved_value));
   EXPECT_EQ(retrieved_value, generateValueForKey(2));
 
-  ASSERT_FALSE(cache.Insert(2, generateValueForKey(99)));
+  ASSERT_TRUE(cache.Insert(2, generateValueForKey(99)));
   EXPECT_EQ(cache.Size(), 1);
   ASSERT_TRUE(cache.Find(2, retrieved_value));
   EXPECT_EQ(retrieved_value, generateValueForKey(99));

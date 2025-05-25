@@ -1,40 +1,45 @@
 #pragma once
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <iostream>
 #include <string>
 
-#define USE_HASH_RESIZER
-
-
+// #define USE_HASH_RESIZER
 
 static const int kNumSegBits = 4;
 static const int segNum = 1 << kNumSegBits;
 
-static const int threadNum = 4;
+static const int threadNum = 8;
 static const int testsNum = 1000000;
 
-static const double size_ratio = 0.1;
+static const double size_ratio = 0.3;
 
-struct HashFuncImplement {
+struct ShardHashFunc {
   size_t operator()(int64_t key) const noexcept {
-    // uint64_t x = static_cast<uint64_t>(key);
-
-    // // MurmurHash3 finalizer-like mixing (or FNV-1a inspired)
-    // x ^= (x >> 33);
-    // x *= 0xff51afd7ed558ccdULL;
-    // x ^= (x >> 33);
-    // x *= 0xc4ceb9fe1a85ec53ULL;
-    // x ^= (x >> 33);
-
-    // return static_cast<size_t>(x);
     return std::hash<int64_t>()(key);
+  }
+};
+
+struct HashFuncImpl {
+  size_t operator()(int64_t key) const noexcept {
+    uint64_t k = static_cast<uint64_t>(key);
+    // // 一个简单的混合，来自例如 Knuth
+    // k = (~k) + (k << 21);  // k = (k << 21) - k - 1;
+    // k = k ^ (k >> 24);
+    // k = (k + (k << 3)) + (k << 8);  // k * 265
+    // k = k ^ (k >> 14);
+    // k = (k + (k << 2)) + (k << 4);  // k * 21
+    // k = k ^ (k >> 28);
+    // k = k + (k << 31);
+    // return static_cast<size_t>(k);
+    return std::hash<int64_t>()(key);  
   }
 };
 
 using KeyType = int64_t;
 using ValueType = std::array<char, 16>;
-using HashType = HashFuncImplement;
+using HashType = HashFuncImpl;
 using KeyEqualType = std::equal_to<KeyType>;
 
 #define LRU_ERR(msg)                            \
@@ -43,11 +48,10 @@ using KeyEqualType = std::equal_to<KeyType>;
     exit(EXIT_FAILURE);                         \
   } while (0)
 #define LRU_ASSERT(cond, msg)                                \
-  \
+                                                             \
   do {                                                       \
     if (!(cond)) {                                           \
       std::cerr << "Assertion failed: " << msg << std::endl; \
       exit(EXIT_FAILURE);                                    \
     }                                                        \
   } while (0)
-

@@ -19,7 +19,7 @@ namespace myLru {
  * @brief LRUCacheHT 的并发策略是哈希表靠自身保证并发安全，链表靠外部锁
  */
 
-template <typename Key, typename Value, typename Hash = HashFuncImplement,
+template <typename Key, typename Value, typename Hash = HashFuncImpl,
           typename KeyEqual = std::equal_to<Key>>
 class LRUCacheHT {
  public:
@@ -75,11 +75,11 @@ class LRUCacheHT {
   auto remove_helper(const Key& key, LRUNode* del_node) -> bool;
 };
 
-template <typename Key, typename Value, typename Hash = HashFuncImplement,
+template <typename Key, typename Value, typename Hash = HashFuncImpl,
           typename KeyEqual = std::equal_to<Key>>
 class SegLRUCacheHT {
  public:
-  using ShardType = LRUCacheHT<Key, Value, Hash, KeyEqual>;
+  using ShardType = LRUCacheHT<Key, Value>;
   using ResizerForShardsType = typename ShardType::ResizerType;
   explicit SegLRUCacheHT(size_t capacity);
   auto Find(const Key& key, Value& value) -> bool;
@@ -108,6 +108,7 @@ class SegLRUCacheHT {
   static auto SegHash(const Key& key) -> size_t {
     return Hash()(key);
   }
+
 };
 
 }  // namespace myLru

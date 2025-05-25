@@ -15,7 +15,7 @@ namespace myLru {
 
 #define SEGLRUCACHE SegLRUCache<Key, Value, Hash, KeyEqual>
 
-template <typename Key, typename Value, typename Hash = HashFuncImplement,
+template <typename Key, typename Value, typename Hash = HashFuncImpl,
           typename KeyEqual = std::equal_to<Key>>
 class LRUCache {
  public:
@@ -71,11 +71,11 @@ class LRUCache {
   auto remove_helper(const Key& key, LRUNode* del_node) -> bool;
 };
 
-template <typename Key, typename Value, typename Hash = HashFuncImplement,
+template <typename Key, typename Value, typename Hash = HashFuncImpl,
           typename KeyEqual = std::equal_to<Key>>
 class SegLRUCache {
  public:
-  using ShardType = LRUCache<Key, Value, Hash, KeyEqual>;
+  using ShardType = LRUCache<Key, Value>;
   using ResizerForShardsType = typename ShardType::ResizerType;
   explicit SegLRUCache(size_t capacity);
   auto Find(const Key& key, Value& value) -> bool;
@@ -90,6 +90,7 @@ class SegLRUCache {
   auto GetHis_Miss() -> void;
 
  private:
+ 
   LRUCACHE lru_cache_[segNum];
 
   // std::atomic<size_t> hit_count_ = 0;
@@ -102,7 +103,7 @@ class SegLRUCache {
   }
 
   static auto SegHash(const Key& key) -> size_t {
-    return Hash()(key);
+    return ShardHashFunc()(key);
   }
 };
 

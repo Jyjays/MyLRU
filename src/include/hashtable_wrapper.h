@@ -23,7 +23,9 @@ class HashTableWrapper {
   HashTableWrapper() {
 #ifdef USE_LIBCUCKOO
     // table_.set_num_buckets(16);
+    //printf("Using libcuckoo hash table.\n");
 #elif defined(USE_MY_HASH_TABLE)
+    //printf("Using custom hash table implementation.\n");
     my_table_.SetSize(16);
 #endif
   }

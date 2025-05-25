@@ -5,16 +5,16 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
-
+#include <shared_mutex>
 #include "config.h"
 
 namespace myLru {
 
-template <typename K, typename V, typename HF = HashFuncImplement,
+template <typename K, typename V, typename HF = HashFuncImpl,
           typename KEF = std::equal_to<K>>
 class HashTableResizer;
 
-template <typename Key, typename Value, typename HashFunc = HashFuncImplement,
+template <typename Key, typename Value, typename HashFunc = HashFuncImpl,
           typename KeyEqualFunc = std::equal_to<Key>>
 class MyHashTable {
  public:
@@ -43,7 +43,7 @@ class MyHashTable {
   }
 
   auto Insert(const Key& key, Value value_to_insert) -> bool {
-    std::unique_lock<std::mutex> lock(read_latch_);
+    std::unique_lock<std::shared_mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
     std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
 
@@ -67,6 +67,7 @@ class MyHashTable {
       }
       // If not found, insert into the temp list.
       temp_chain.emplace_back(key, value_to_insert);
+      elems_++;
       return true;
     } else {
       chain.emplace_back(key, value_to_insert);
@@ -89,7 +90,9 @@ class MyHashTable {
   }
 
   auto Remove(const Key& key) -> bool {
-    std::unique_lock<std::mutex> lock(read_latch_);
+    //std::unique_lock<std::mutex> lock(read_latch_);
+    //std::unique_lock<std::mutex> lock(latch_);
+    std::unique_lock<std::shared_mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
 
     if (resizing_) {
@@ -120,37 +123,39 @@ class MyHashTable {
   }
 
   auto Resize() -> void {
+    std::shared_lock<std::shared_mutex> lock(read_latch_);
     size_t new_length_ = length_ << 1;
     std::vector<std::vector<std::pair<Key, Value>>> new_list(new_length_);
-    // Copy the old elements to the new list
-    for (size_t i = 0; i < length_; i++) {
-      std::vector<std::pair<Key, Value>>& chain = list_[i];
 
+    for (auto& chain : list_) {
       for (auto& entry : chain) {
         size_t new_bucket_idx =
             GetBucketIndexInternal(entry.first, new_length_);
         new_list[new_bucket_idx].emplace_back(entry.first, entry.second);
       }
     }
-    std::lock_guard<std::mutex> lock(read_latch_);
-    list_ = std::move(new_list);
-    length_ = new_length_;
-    resizing_ = false;
+
+    lock.unlock();
+    std::unique_lock<std::shared_mutex> write_lock(read_latch_);
     // Insert the elements from the temp list to new list
-    // std::lock_guard<std::mutex> lock(latch_);
     if (temp_list_.empty() || resizer_ == nullptr) {
+      length_ = new_length_;
+      list_ = std::move(new_list);
+      resizing_ = false;
       return;
     }
-    for (size_t i = 0; i < temp_list_size; i++) {
-      auto& temp_chain = temp_list_[i];
-      for (auto& entry : temp_chain) {
+    for (auto& chain : temp_list_) {
+      for (auto& entry : chain) {
         size_t new_bucket_idx =
             GetBucketIndexInternal(entry.first, new_length_);
-        list_[new_bucket_idx].emplace_back(entry.first, entry.second);
+        new_list[new_bucket_idx].emplace_back(entry.first, entry.second);
       }
     }
     // Clear the temp list after the resizing set to false
     temp_list_.clear();
+    length_ = new_length_;
+    list_ = std::move(new_list);
+    resizing_ = false;
   }
 
   auto SetSize(size_t size) -> void {
@@ -180,7 +185,8 @@ class MyHashTable {
   // The actual hash table
   std::vector<std::vector<std::pair<Key, Value>>> list_;
   // Mutex for list_
-  std::mutex read_latch_;
+  // std::mutex read_latch_;
+  std::shared_mutex read_latch_;
   // The number of buckets in the hash table
   size_t length_;
   // The number of elements in the hash table
@@ -188,7 +194,7 @@ class MyHashTable {
   // Temporary list for resizing
   std::vector<std::vector<std::pair<Key, Value>>> temp_list_;
   // Mutex for temp_list_
-  // std::mutex latch_;
+  //std::mutex latch_;
   // Hash function
   HashFunc hash_function_;
   // Key equality function
@@ -201,6 +207,9 @@ class MyHashTable {
   static const size_t temp_list_size = 8;
 
   auto GetBucketIndex(const Key& key) const -> size_t {
+    if (length_ == 0) {
+      throw std::runtime_error("Hash table is not initialized.");
+    }
     return hash_function_(key) & (length_ - 1);
   }
 
@@ -210,8 +219,14 @@ class MyHashTable {
   }
 
   auto FindValuePtr(const Key& key) -> Value* {
-    std::unique_lock<std::mutex> lock(read_latch_);
+    std::shared_lock<std::shared_mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
+    // printf("Bucket index: %zu, list size: %zu\n", bucket_idx,
+    // list_.size());
+    if (bucket_idx >= list_.size()) {
+      LRU_ERR("Bucket index out of bounds");
+      return nullptr;  // Bucket index out of bounds
+    }
     std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
 
     for (auto& pair_entry : chain) {

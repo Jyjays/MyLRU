@@ -37,6 +37,11 @@ auto LRUCACHE::Find(const Key& key, Value& value) -> bool {
   if (!hash_table_.Get(key, cur_node)) {
     return false;
   }
+  if (cur_node == nullptr || cur_node->key_ != key) {
+    // LRU_ERR("Something wrong in hashtable.");
+    std::cout << key << " " << cur_node->key_ << std::endl;
+    return false;
+  }
   value = cur_node->value_;
   remove_node(cur_node);
   push_node(cur_node);
@@ -66,7 +71,7 @@ auto LRUCACHE::Insert(const Key& key, Value value) -> bool {
     return false;
   }
 
-  push_node(new_node);  
+  push_node(new_node);
   cur_size_++;
   return true;
 }
@@ -124,7 +129,7 @@ auto LRUCACHE::evict() -> void {
   }
   remove_node(last_node);
   if (!hash_table_.Remove(last_node->key_)) {
-    //LRU_ERR("Failed to remove key from hash table");
+    // LRU_ERR("Failed to remove key from hash table");
   }
   cur_size_--;
   delete last_node;
@@ -176,9 +181,9 @@ LRUCACHE_TEMPLATE_ARGUMENTS
 auto SEGLRUCACHE::Find(const Key& key, Value& value) -> bool {
   int32_t hash = SegHash(key);
   if (lru_cache_[Shard(hash)].Find(key, value)) {
-    //hit_count_++;
+    // hit_count_++;
     return true;
-  } 
+  }
   return false;
 }
 
@@ -247,7 +252,8 @@ auto SEGLRUCACHE::GetHis_Miss() -> void {
   // printf("Hit Ratio: %.2f%%\n",
   //        static_cast<double>(hit_count_) / (hit_count_ + miss_count_) * 100);
   // printf("Miss Ratio: %.2f%%\n",
-  //        static_cast<double>(miss_count_) / (hit_count_ + miss_count_) * 100);
+  //        static_cast<double>(miss_count_) / (hit_count_ + miss_count_) *
+  //        100);
 }
 
 template class LRUCache<KeyType, ValueType, HashType, KeyEqualType>;

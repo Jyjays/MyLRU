@@ -43,11 +43,12 @@ auto LRUCACHEHT::Find(const Key& key, Value& value) -> bool {
   }
   // std::unique_lock<std::mutex> lock(latch_);
   // // cur_node 有垂悬指针的可能性
-  if (cur_node == nullptr || cur_node->prev_ == nullptr ||
-      cur_node->next_ == nullptr) {
+  if (cur_node == nullptr || cur_node->key_ != key ||
+      cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
+    // LRU_ERR("Something wrong in hashtable.");
+    // std::cout << key << " " << cur_node->key_ << std::endl;
     return false;
   }
-
   value = cur_node->value_;
   remove_node(cur_node);
   push_node(cur_node);
@@ -170,6 +171,18 @@ SEGLRUCACHEHT::SegLRUCacheHT(size_t capacity) : lru_cache_() {
 #endif
   }
 }
+
+// LRUCACHEHT_TEMPLATE_ARGUMENTS
+// SEGLRUCACHEHT::SegLRUCacheHT(size_t capacity, int seg_num)
+//     : segNum_(seg_num), lru_cache_() {
+//   lru_cache_.resize(segNum_);
+//   for (size_t i = 0; i < segNum; ++i) {
+//     lru_cache_[i].Resize(capacity);
+// #ifdef USE_HASH_RESIZER
+//     lru_cache_[i].SetResizer(&resizer_);
+// #endif
+//   }
+// }
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
 auto SEGLRUCACHEHT::Find(const Key& key, Value& value) -> bool {
