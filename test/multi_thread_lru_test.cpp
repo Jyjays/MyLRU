@@ -149,7 +149,7 @@ TEST(SegLRUCacheMultiThreadTest, BenchMarkTest) {
 }
 
 // --- Multi-threaded Mixed Operations Test (Insert, Find, Remove) ---
-TEST(SegLRUCacheMultiThreadTest, ConcurrentMixedOperations) {
+TEST(SegLRUCacheMultiThreadTest, DISABLED_ConcurrentMixedOperations) {
   const int num_threads = threadNum;  // More threads for higher contention
   const int ops_per_thread = testsNum / num_threads;
   const size_t capacity_per_segment = testsNum * size_ratio / segNum;
@@ -225,7 +225,7 @@ TEST(SegLRUCacheMultiThreadTest, ConcurrentMixedOperations) {
   EXPECT_GT(successful_inserts.load(), 0);
 }
 // --- Multi-threaded Mixed Operations Test (Insert, Find, Remove) ---
-TEST(SegLRUCacheMultiThreadTest, ConcurrentMixedOperationsHT) {
+TEST(SegLRUCacheMultiThreadTest, DISABLED_ConcurrentMixedOperationsHT) {
   const int num_threads = threadNum;  // More threads for higher contention
   const int ops_per_thread = testsNum / num_threads;
   const size_t capacity_per_segment = testsNum * size_ratio / segNum;

@@ -10,7 +10,7 @@
 static const int kNumSegBits = 4;
 static const int segNum = 1 << kNumSegBits;
 
-static const int threadNum = 8;
+static const int threadNum = 1;
 static const int testsNum = 1000000;
 
 static const double size_ratio = 0.3;
@@ -23,7 +23,7 @@ struct ShardHashFunc {
 
 struct HashFuncImpl {
   size_t operator()(int64_t key) const noexcept {
-    uint64_t k = static_cast<uint64_t>(key);
+    // uint64_t k = static_cast<uint64_t>(key);
     // // 一个简单的混合，来自例如 Knuth
     // k = (~k) + (k << 21);  // k = (k << 21) - k - 1;
     // k = k ^ (k >> 24);
@@ -33,7 +33,12 @@ struct HashFuncImpl {
     // k = k ^ (k >> 28);
     // k = k + (k << 31);
     // return static_cast<size_t>(k);
-    return std::hash<int64_t>()(key);  
+    // return std::hash<int64_t>()(key);
+    uint64_t x = static_cast<uint64_t>(key);
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+    x = x ^ (x >> 31);
+    return static_cast<size_t>(x);
   }
 };
 

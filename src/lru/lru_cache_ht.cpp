@@ -38,17 +38,14 @@ auto LRUCACHEHT::Find(const Key& key, Value& value) -> bool {
   }
   std::unique_lock<std::mutex> lock(latch_, std::try_to_lock);
   if (!lock.owns_lock()) {
-    // printf("Failed to acquire lock in Find\n");
+    value = cur_node->value_;
     return true;
   }
-  // std::unique_lock<std::mutex> lock(latch_);
-  // // cur_node 有垂悬指针的可能性
-  if (cur_node == nullptr || cur_node->key_ != key ||
-      cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
-    // LRU_ERR("Something wrong in hashtable.");
-    // std::cout << key << " " << cur_node->key_ << std::endl;
-    return false;
-  }
+  // if (cur_node == nullptr || cur_node->key_ != key ||
+  //     cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
+  //   // LRU_ERR("Something wrong in hashtable.");
+  //   return false;
+  // }
   value = cur_node->value_;
   remove_node(cur_node);
   push_node(cur_node);
@@ -57,23 +54,24 @@ auto LRUCACHEHT::Find(const Key& key, Value& value) -> bool {
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
 auto LRUCACHEHT::Insert(const Key& key, Value value) -> bool {
-  LRUNode* node = new LRUNode(key, value);
-  if (!hash_table_.Insert(key, node)) {
-    delete node;
-    return false;
-  }
-  std::unique_lock<std::mutex> lock(latch_);
+  std::lock_guard<std::mutex> lock(latch_);
   if (cur_size_ == max_size_) {
     evict();
   }
-  push_node(node);
+  LRUNode* new_node = new LRUNode(key, value);
+  if (!hash_table_.Insert(key, new_node)) {
+    delete new_node;
+    return false;
+  }
+
+  push_node(new_node);
   cur_size_++;
   return true;
 }
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
 auto LRUCACHEHT::Remove(const Key& key) -> bool {
-  std::unique_lock<std::mutex> lock(latch_);
+  std::lock_guard<std::mutex> lock(latch_);
   if (cur_size_ == 0) {
     return false;
   }
@@ -86,13 +84,13 @@ auto LRUCACHEHT::Remove(const Key& key) -> bool {
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
 auto LRUCACHEHT::Size() -> size_t {
-  std::unique_lock<std::mutex> lock(latch_);
+  std::lock_guard<std::mutex> lock(latch_);
   return cur_size_;
 }
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
 auto LRUCACHEHT::Clear() -> void {
-  std::unique_lock<std::mutex> lock(latch_);
+  std::lock_guard<std::mutex> lock(latch_);
   LRUNode* cur_node = head_->next_;
   while (cur_node != tail_) {
     LRUNode* next_node = cur_node->next_;
@@ -107,7 +105,7 @@ auto LRUCACHEHT::Clear() -> void {
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
 auto LRUCACHEHT::Resize(size_t size) -> void {
-  std::unique_lock<std::mutex> lock(latch_);
+  std::lock_guard<std::mutex> lock(latch_);
   if (size < max_size_) {
     while (cur_size_ > size) {
       evict();
@@ -145,8 +143,8 @@ auto LRUCACHEHT::remove_node(LRUNode* node) -> void {
   LRUNode* ori_prev = node->prev_;
   ori_next->prev_ = ori_prev;
   ori_prev->next_ = ori_next;
-  node->next_ = nullptr;
-  node->prev_ = nullptr;
+  // node->next_ = nullptr;
+  // node->prev_ = nullptr;
 }
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS

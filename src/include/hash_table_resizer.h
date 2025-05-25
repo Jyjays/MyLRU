@@ -12,7 +12,7 @@
 
 namespace myLru {
 
-#define DEFAULT_NUM_THREADS 1
+#define DEFAULT_NUM_THREADS 2
 
 template <typename Key, typename Value, typename HashFunc,
           typename KeyEqualFunc>

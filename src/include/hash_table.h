@@ -43,7 +43,7 @@ class MyHashTable {
   }
 
   auto Insert(const Key& key, Value value_to_insert) -> bool {
-    std::unique_lock<std::shared_mutex> lock(read_latch_);
+    //std::unique_lock<std::shared_mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
     std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
 
@@ -82,7 +82,7 @@ class MyHashTable {
         initialize_temp_list();
         resizer_->EnqueueResize(this);
       } else {
-        lock.unlock();
+        //lock.unlock();
         Resize();
       }
     }
@@ -92,7 +92,7 @@ class MyHashTable {
   auto Remove(const Key& key) -> bool {
     //std::unique_lock<std::mutex> lock(read_latch_);
     //std::unique_lock<std::mutex> lock(latch_);
-    std::unique_lock<std::shared_mutex> lock(read_latch_);
+    //std::unique_lock<std::shared_mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
 
     if (resizing_) {
@@ -123,7 +123,7 @@ class MyHashTable {
   }
 
   auto Resize() -> void {
-    std::shared_lock<std::shared_mutex> lock(read_latch_);
+    //std::shared_lock<std::shared_mutex> lock(read_latch_);
     size_t new_length_ = length_ << 1;
     std::vector<std::vector<std::pair<Key, Value>>> new_list(new_length_);
 
@@ -135,8 +135,8 @@ class MyHashTable {
       }
     }
 
-    lock.unlock();
-    std::unique_lock<std::shared_mutex> write_lock(read_latch_);
+    // lock.unlock();
+    // std::unique_lock<std::shared_mutex> write_lock(read_latch_);
     // Insert the elements from the temp list to new list
     if (temp_list_.empty() || resizer_ == nullptr) {
       length_ = new_length_;
@@ -194,7 +194,7 @@ class MyHashTable {
   // Temporary list for resizing
   std::vector<std::vector<std::pair<Key, Value>>> temp_list_;
   // Mutex for temp_list_
-  //std::mutex latch_;
+  std::mutex latch_;
   // Hash function
   HashFunc hash_function_;
   // Key equality function
@@ -219,7 +219,8 @@ class MyHashTable {
   }
 
   auto FindValuePtr(const Key& key) -> Value* {
-    std::shared_lock<std::shared_mutex> lock(read_latch_);
+    //std::shared_lock<std::shared_mutex> lock(read_latch_);
+    //std::unique_lock<std::shared_mutex> lock(read_latch_);
     size_t bucket_idx = GetBucketIndex(key);
     // printf("Bucket index: %zu, list size: %zu\n", bucket_idx,
     // list_.size());
