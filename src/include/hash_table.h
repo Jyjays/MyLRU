@@ -2,10 +2,11 @@
 
 #include <condition_variable>
 #include <functional>
+#include <shared_mutex>
 #include <stdexcept>
 #include <utility>
 #include <vector>
-#include <shared_mutex>
+
 #include "config.h"
 
 namespace myLru {
@@ -31,9 +32,17 @@ class MyHashTable {
       length_ <<= 1;
     }
     list_.resize(length_);
+    current_list_.store(&list_);
   }
 
   auto Get(const Key& key, Value& value_out) -> bool {
+#ifdef USE_HASH_RESIZER
+#ifdef USE_SHARED_LATCH
+    std::shared_lock<std::shared_mutex> lock(read_latch_);
+#else
+    std::lock_guard<std::mutex> lock(latch_);
+#endif
+#endif
     Value* found_value_ptr = FindValuePtr(key);
     if (found_value_ptr != nullptr) {
       value_out = *found_value_ptr;
@@ -43,9 +52,17 @@ class MyHashTable {
   }
 
   auto Insert(const Key& key, Value value_to_insert) -> bool {
-    //std::unique_lock<std::shared_mutex> lock(read_latch_);
+#ifdef USE_HASH_RESIZER
+#ifdef USE_SHARED_LATCH
+    std::unique_lock<std::shared_mutex> lock(read_latch_);
+#else
+    std::unique_lock<std::mutex> lock(latch_);
+#endif
+#endif
     size_t bucket_idx = GetBucketIndex(key);
-    std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
+    auto current_list = current_list_.load();
+    std::vector<std::pair<Key, Value>>& chain = (*current_list)[bucket_idx];
+    // std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
 
     for (auto& pair_entry : chain) {
       if (key_equal_(pair_entry.first, key)) {
@@ -77,22 +94,34 @@ class MyHashTable {
     // When the number of elements is more than 2 times the length,
     // we need to resize the hash table.
     if (elems_ > 2 * length_) {
-      if (resizer_ != nullptr) {
+#ifdef USE_HASH_RESIZER
+      // Check if resizing is already in progress!!
+      if (resizer_ != nullptr && !resizing_) {
         resizing_ = true;
-        initialize_temp_list();
+        if (temp_list_.empty()) {
+          initialize_temp_list();
+        }
         resizer_->EnqueueResize(this);
       } else {
-        //lock.unlock();
+        lock.unlock();
         Resize();
       }
+#else
+      Resize();
+#endif
     }
     return true;
   }
 
   auto Remove(const Key& key) -> bool {
-    //std::unique_lock<std::mutex> lock(read_latch_);
-    //std::unique_lock<std::mutex> lock(latch_);
-    //std::unique_lock<std::shared_mutex> lock(read_latch_);
+#ifdef USE_HASH_RESIZER
+#ifdef USE_SHARED_LATCH
+    std::unique_lock<std::shared_mutex> lock(read_latch_);
+#else
+    std::lock_guard<std::mutex> lock(latch_);
+#endif
+#endif
+    auto current_list = current_list_.load();
     size_t bucket_idx = GetBucketIndex(key);
 
     if (resizing_) {
@@ -110,7 +139,7 @@ class MyHashTable {
         }
       }
     }
-    std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
+    std::vector<std::pair<Key, Value>>& chain = (*current_list)[bucket_idx];
     for (auto& entry : chain) {
       if (key_equal_(entry.first, key)) {
         chain.erase(std::remove(chain.begin(), chain.end(), entry),
@@ -123,10 +152,17 @@ class MyHashTable {
   }
 
   auto Resize() -> void {
-    //std::shared_lock<std::shared_mutex> lock(read_latch_);
+#ifdef USE_HASH_RESIZER
+#ifdef USE_SHARED_LATCH
+    std::shared_lock<std::shared_mutex> lock(read_latch_);
+    // std::unique_lock<std::shared_mutex> write_lock(read_latch_);
+#else
+    std::lock_guard<std::mutex> lock(latch_);
+#endif
+#endif
     size_t new_length_ = length_ << 1;
     std::vector<std::vector<std::pair<Key, Value>>> new_list(new_length_);
-
+    old_list_ptr_.store(&list_);
     for (auto& chain : list_) {
       for (auto& entry : chain) {
         size_t new_bucket_idx =
@@ -134,14 +170,23 @@ class MyHashTable {
         new_list[new_bucket_idx].emplace_back(entry.first, entry.second);
       }
     }
-
+#ifdef USE_HASH_RESIZER
+#ifdef USE_SHARED_LATCH
     // lock.unlock();
     // std::unique_lock<std::shared_mutex> write_lock(read_latch_);
+    // std::lock_guard<std::mutex> write_lock(latch_);
+#else
+    // std::lock_guard<std::mutex> lock(latch_);
+#endif
+#endif
+
     // Insert the elements from the temp list to new list
     if (temp_list_.empty() || resizer_ == nullptr) {
       length_ = new_length_;
       list_ = std::move(new_list);
+      current_list_.store(&list_);
       resizing_ = false;
+      //resizer_->DelayGC(*old_list_ptr_.load());
       return;
     }
     for (auto& chain : temp_list_) {
@@ -155,10 +200,19 @@ class MyHashTable {
     temp_list_.clear();
     length_ = new_length_;
     list_ = std::move(new_list);
+    current_list_.store(&list_);
+   // resizer_->DelayGC(*old_list_ptr_.load());
     resizing_ = false;
   }
 
   auto SetSize(size_t size) -> void {
+#ifdef USE_HASH_RESIZER
+#ifdef USE_SHARED_LATCH
+    std::unique_lock<std::shared_mutex> lock(read_latch_);
+#else
+    std::lock_guard<std::mutex> lock(latch_);
+#endif
+#endif
     if (size == 0) {
       size = 1;
     }
@@ -167,16 +221,25 @@ class MyHashTable {
       length_ <<= 1;
     }
     list_.resize(length_);
+    current_list_.store(&list_);
   }
 
   auto Size() const -> size_t { return elems_; }
 
   auto Clear() -> void {
+#ifdef USE_HASH_RESIZER
+#ifdef USE_SHARED_LATCH
+    std::unique_lock<std::shared_mutex> lock(read_latch_);
+#else
+    std::lock_guard<std::mutex> lock(latch_);
+#endif
+#endif
     for (auto& chain : list_) {
       chain.clear();
     }
     elems_ = 0;
     list_.assign(length_, std::vector<std::pair<Key, Value>>());
+    current_list_.store(&list_);
   }
 
   auto SetResizer(HashTableResizerType* resizer) -> void { resizer_ = resizer; }
@@ -184,6 +247,10 @@ class MyHashTable {
  private:
   // The actual hash table
   std::vector<std::vector<std::pair<Key, Value>>> list_;
+
+  std::atomic<std::vector<std::vector<std::pair<Key, Value>>>*> current_list_;
+
+  std::atomic<std::vector<std::vector<std::pair<Key, Value>>>*> old_list_ptr_;
   // Mutex for list_
   // std::mutex read_latch_;
   std::shared_mutex read_latch_;
@@ -219,16 +286,9 @@ class MyHashTable {
   }
 
   auto FindValuePtr(const Key& key) -> Value* {
-    //std::shared_lock<std::shared_mutex> lock(read_latch_);
-    //std::unique_lock<std::shared_mutex> lock(read_latch_);
-    size_t bucket_idx = GetBucketIndex(key);
-    // printf("Bucket index: %zu, list size: %zu\n", bucket_idx,
-    // list_.size());
-    if (bucket_idx >= list_.size()) {
-      LRU_ERR("Bucket index out of bounds");
-      return nullptr;  // Bucket index out of bounds
-    }
-    std::vector<std::pair<Key, Value>>& chain = list_[bucket_idx];
+    auto* current_list = current_list_.load();
+    size_t bucket_idx = GetBucketIndexInternal(key, length_);
+    std::vector<std::pair<Key, Value>>& chain = (*current_list)[bucket_idx];
 
     for (auto& pair_entry : chain) {
       if (key_equal_(pair_entry.first, key)) {
@@ -239,7 +299,6 @@ class MyHashTable {
       size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_size);
       std::vector<std::pair<Key, Value>>& temp_chain =
           temp_list_[temp_bucket_idx];
-
       for (auto& pair_entry : temp_chain) {
         if (key_equal_(pair_entry.first, key)) {
           return &(pair_entry.second);
@@ -253,5 +312,4 @@ class MyHashTable {
     temp_list_.resize(temp_list_size);
   }
 };
-
 }  // namespace myLru

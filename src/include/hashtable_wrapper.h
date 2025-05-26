@@ -5,6 +5,8 @@
 #include <libcuckoo/cuckoohash_map.hh>
 #elif defined(USE_MY_HASH_TABLE)
 #include "hash_table.h"
+#elif defined(USE_SEG_HASH_TABLE)
+#include "seg_hash_table.h"
 #else
 #define USE_LIBCUCKOO
 #include <libcuckoo/cuckoohash_map.hh>
@@ -23,10 +25,13 @@ class HashTableWrapper {
   HashTableWrapper() {
 #ifdef USE_LIBCUCKOO
     // table_.set_num_buckets(16);
-    //printf("Using libcuckoo hash table.\n");
+    // printf("Using libcuckoo hash table.\n");
 #elif defined(USE_MY_HASH_TABLE)
     //printf("Using custom hash table implementation.\n");
-    my_table_.SetSize(16);
+    my_table_.SetSize(4096);
+#elif defined(USE_SEG_HASH_TABLE)
+    // printf("Using segmented hash table implementation.\n");
+    my_table_.SetSize(4096);
 #endif
   }
 
@@ -37,6 +42,10 @@ class HashTableWrapper {
 #ifdef USE_LIBCUCKOO
     table_.clear();
 #elif defined(USE_MY_HASH_TABLE)
+    my_table_.Clear();
+    //printf("Using segmented hash table implementation.\n");
+#elif defined(USE_SEG_HASH_TABLE)
+    //printf("Using segmented hash table implementation.\n");
     my_table_.Clear();
 #endif
   }
@@ -53,6 +62,8 @@ class HashTableWrapper {
     return table_.insert(key, value);
 #elif defined(USE_MY_HASH_TABLE)
     return my_table_.Insert(key, value);
+#elif defined(USE_SEG_HASH_TABLE)
+    return my_table_.Insert(key, value);
 #endif
   }
 
@@ -60,6 +71,8 @@ class HashTableWrapper {
 #ifdef USE_LIBCUCKOO
     return table_.find(key, value_out);
 #elif defined(USE_MY_HASH_TABLE)
+    return my_table_.Get(key, value_out);
+#elif defined(USE_SEG_HASH_TABLE)
     return my_table_.Get(key, value_out);
 #endif
   }
@@ -69,6 +82,8 @@ class HashTableWrapper {
     return table_.erase(key);
 #elif defined(USE_MY_HASH_TABLE)
     return my_table_.Remove(key);
+#elif defined(USE_SEG_HASH_TABLE)
+    return my_table_.Remove(key);
 #endif
   }
 
@@ -76,6 +91,8 @@ class HashTableWrapper {
 #ifdef USE_LIBCUCKOO
     return table_.size();
 #elif defined(USE_MY_HASH_TABLE)
+    return my_table_.Size();
+#elif defined(USE_SEG_HASH_TABLE)
     return my_table_.Size();
 #endif
   }
@@ -85,11 +102,15 @@ class HashTableWrapper {
     table_.clear();
 #elif defined(USE_MY_HASH_TABLE)
     my_table_.Clear();
+#elif defined(USE_SEG_HASH_TABLE)
+    my_table_.Clear();
 #endif
   }
 
   auto SetResizer(HashTableResizerType* resizer) -> void {
 #ifdef USE_MY_HASH_TABLE
+    my_table_.SetResizer(resizer);
+#elif defined(USE_SEG_HASH_TABLE)
     my_table_.SetResizer(resizer);
 #endif
   }
@@ -99,6 +120,8 @@ class HashTableWrapper {
   libcuckoo::cuckoohash_map<Key, Value, Hash, KeyEqual> table_;
 #elif defined(USE_MY_HASH_TABLE)
   MyHashTable<Key, Value, Hash, KeyEqual> my_table_;
+#elif defined(USE_SEG_HASH_TABLE)
+  SegHashTable<Key, Value, Hash, KeyEqual> my_table_;
 #endif
 };
 

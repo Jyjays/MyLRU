@@ -12,7 +12,7 @@
 
 namespace myLru {
 
-#define DEFAULT_NUM_THREADS 2
+#define DEFAULT_NUM_THREADS 1
 
 template <typename Key, typename Value, typename HashFunc,
           typename KeyEqualFunc>
@@ -21,14 +21,25 @@ class HashTableResizer {
   using HashTableType = MyHashTable<Key, Value, HashFunc, KeyEqualFunc>;
 
   HashTableResizer() : stop_requested_(false) {
-    //resize_thread_ = std::thread(&HashTableResizer::ResizeThread, this);
-    printf("HashTableResizer: %d threads\n", DEFAULT_NUM_THREADS);
+#ifdef USE_HASH_RESIZER
+    printf("HashTableResizer is enabled with %d threads.\n",
+           DEFAULT_NUM_THREADS);
+#endif
+#ifdef USE_SHARED_LATCH
+    printf("Using shared mutex for read operations.\n");
+#endif
     for (int i = 0; i < DEFAULT_NUM_THREADS; ++i) {
       threads_.emplace_back(&HashTableResizer::ResizeThread, this);
     }
   }
 
   HashTableResizer(int size) : stop_requested_(false) {
+#ifdef USE_HASH_RESIZER
+    printf("HashTableResizer is enabled with %d threads.\n", size);
+#endif
+#ifdef USE_SHARED_LATCH
+    printf("Using shared mutex for read operations.\n");
+#endif
     for (int i = 0; i < size; ++i) {
       threads_.emplace_back(&HashTableResizer::ResizeThread, this);
     }
@@ -37,10 +48,10 @@ class HashTableResizer {
   ~HashTableResizer() {
     {
       std::unique_lock<std::mutex> lock(latch_);
-      stop_requested_ = true;  
+      stop_requested_ = true;
     }
-    cv_.notify_all(); 
-    for (auto &thread: threads_) {
+    cv_.notify_all();
+    for (auto& thread : threads_) {
       thread.join();
     }
   }
@@ -50,10 +61,18 @@ class HashTableResizer {
   HashTableResizer& operator=(const HashTableResizer&) = delete;
 
   void EnqueueResize(HashTableType* table) {
-    if (table == nullptr) return; 
+    if (table == nullptr) return;
     std::unique_lock<std::mutex> lock(latch_);
     resize_queue_.push(table);
     cv_.notify_one();
+  }
+
+  void DelayGC(std::vector<std::vector<std::pair<Key, Value>>> & gc_list) {
+    // 启动一个线程，延迟若干时间后释放gc_list
+    std::thread([gc_list = std::move(gc_list)]() mutable {
+      std::this_thread::sleep_for(std::chrono::seconds(1));  // 延迟1秒
+      gc_list.clear();  // 清空gc_list
+    }).detach();
   }
 
  private:
@@ -77,10 +96,9 @@ class HashTableResizer {
 
       if (re_table != nullptr) {
         try {
-          re_table
-              ->Resize(); 
+          re_table->Resize();
         } catch (const std::exception& e) {
-            std::cerr << "Exception in resizing: " << e.what() << std::endl;
+          std::cerr << "Exception in resizing: " << e.what() << std::endl;
         }
       }
     }
@@ -92,7 +110,7 @@ class HashTableResizer {
   // Condition variable to notify threads
   std::condition_variable cv_;
   // Flag to signal the thread to stop
-  std::atomic<bool> stop_requested_;  
+  std::atomic<bool> stop_requested_;
   // std::optional<std::thread> resize_thread_;
   std::vector<std::thread> threads_;
 };

@@ -37,12 +37,14 @@ auto LRUCACHE::Find(const Key& key, Value& value) -> bool {
   if (!hash_table_.Get(key, cur_node)) {
     return false;
   }
-  // if (cur_node == nullptr || cur_node->key_ != key ||
-  //     cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
-  //   // LRU_ERR("Something wrong in hashtable.");
-  //   std::cout << key << " " << cur_node->key_ << std::endl;
-  //   return false;
-  // }
+#ifdef USE_HASH_RESIZER
+  if (cur_node == nullptr || cur_node->key_ != key ||
+      cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
+    // LRU_ERR("Something wrong in hashtable.");
+    // std::cout << key << " " << cur_node->key_ << std::endl;
+    return false;
+  }
+#endif
   value = cur_node->value_;
   remove_node(cur_node);
   push_node(cur_node);

@@ -20,25 +20,9 @@ if(ENABLE_ASAN)
 else()
     message(STATUS "AddressSanitizer (ASan) is disabled.")
 endif()
-# --- ASan 配置结束 --- 
 
 # 添加 libcuckoo（如果它的 CMakeLists.txt 需要）
 add_subdirectory(third_party/libcuckoo)
-
-# 定义可执行文件
-# add_executable(mylru
-#     src/main.cpp
-#     src/lru/lru_cache.cpp 
-# )
-
-# # 添加包含目录
-# target_include_directories(mylru PRIVATE
-#     "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
-#     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/libcuckoo"  # 确保 libcuckoo 头文件路径
-# )
-
-# # 添加预处理器定义
-# target_compile_definitions(mylru PRIVATE USE_LIBCUCKOO)
 
 # 查找并链接 Pthreads
 find_package(Threads REQUIRED)
@@ -53,6 +37,8 @@ add_executable(mylru_tests
     src/lru/lru_cache.cpp 
     src/lru/lru_cache_ht.cpp
 )
+
+
 
 # 为单线程测试目标添加包含目录
 target_include_directories(mylru_tests PRIVATE
@@ -89,10 +75,36 @@ target_include_directories(mylru_tests_mt PRIVATE
 
 # 为多线程测试目标添加预处理器定义
 # target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
-target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE)
-
+target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE USE_HASH_RESIZER USE_SHARED_LATCH)
+# target_compile_definitions(mylru_tests_mt PRIVATE USE_SEG_HASH_TABLE)
+#  USE_HASH_RESIZER USE_SHARED_LATCH
 # 链接 Google Test 和 Pthreads
 target_link_libraries(mylru_tests_mt PRIVATE
+    gtest
+    gtest_main
+    Threads::Threads
+)
+
+
+add_executable(mylru_tests_mt_ht
+    test/multi_thread_lru_ht_test.cpp
+    src/lru/lru_cache.cpp
+    src/lru/lru_cache_ht.cpp
+)
+# 为多线程测试目标添加包含目录
+target_include_directories(mylru_tests_mt_ht PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/test"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/libcuckoo"  # 确保 libcuckoo 头文件路径
+)
+
+# 为多线程测试目标添加预处理器定义
+# target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_LIBCUCKOO)
+target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_MY_HASH_TABLE USE_HASH_RESIZER USE_SHARED_LATCH)
+# target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_SEG_HASH_TABLE)
+
+# 链接 Google Test 和 Pthreads
+target_link_libraries(mylru_tests_mt_ht PRIVATE
     gtest
     gtest_main
     Threads::Threads
@@ -102,7 +114,7 @@ target_link_libraries(mylru_tests_mt PRIVATE
 enable_testing()
 add_test(NAME MyLRUTests COMMAND mylru_tests)
 add_test(NAME MyLRUMultiThreadTests COMMAND mylru_tests_mt)
-
+add_test(NAME MyLRUMultiThreadTestsHT COMMAND mylru_tests_mt_ht)
 # 打印调试信息
 message(STATUS "Configuring MYLRU_Cache project")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
