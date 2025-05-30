@@ -19,6 +19,8 @@ template <typename Key, typename Value, typename Hash = HashFuncImpl,
           typename KeyEqual = std::equal_to<Key>>
 class LRUCache {
  public:
+  struct LRUNode;
+  inline static LRUNode* const OutOfListMarker = reinterpret_cast<LRUNode*>(-1);
   struct LRUNode {
     LRUNode() : next_(nullptr), prev_(nullptr) {}
     LRUNode(const Key& key, const Value& value) : key_(key), value_(value) {}
@@ -27,6 +29,8 @@ class LRUCache {
     LRUNode* prev_;
     Key key_;
     Value value_;
+
+    auto inList() -> bool { return prev_ != LRUCache::OutOfListMarker; }
   };
 
   using ResizerType = HashTableResizer<Key, LRUNode*, Hash, KeyEqual>;

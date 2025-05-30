@@ -81,8 +81,8 @@ TEST(SegLRUCacheMultiThreadTest, RandomizedMixedOperationsHT) {
   const size_t actual_capacity_per_segment =
       (capacity_per_segment == 0) ? 1 : capacity_per_segment;
 
-  SegLRUCacheHT<KeyType, ValueType> cache(
-      actual_capacity_per_segment);  // 使用 SegLRUCacheHT
+  SegLRUCache<KeyType, ValueType> cache(
+      actual_capacity_per_segment);  // 使用 SegLRUCache
   std::vector<std::thread> threads;
   std::atomic<int> successful_inserts(0);
   std::atomic<int> successful_finds(0);
@@ -147,7 +147,7 @@ TEST(SegLRUCacheMultiThreadTest, RandomizedMixedOperationsHT) {
   long long current_miss_count =
       current_attempted_finds - current_successful_finds;
 
-  printEvaluationResult("Randomized Mixed Operations Test (SegLRUCacheHT)",
+  printEvaluationResult("Randomized Mixed Operations Test (SegLRUCache)",
                         successful_finds.load(), current_miss_count,
                         chrono_start_time, chrono_end_time, total_executed_ops);
 

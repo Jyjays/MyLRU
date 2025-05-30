@@ -40,11 +40,31 @@ LRUCACHE::~LRUCache() {
 
 LRUCACHE_TEMPLATE_ARGUMENTS
 auto LRUCACHE::Find(const Key& key, Value& value) -> bool {
+#ifdef USE_HHVM
+  LRUNode* cur_node;
+  if (!hash_table_.Get(key, cur_node)) {
+    return false;
+  }
+#else
   std::lock_guard<std::mutex> lock(latch_);
   LRUNode* cur_node;
   if (!hash_table_.Get(key, cur_node)) {
     return false;
   }
+
+#endif
+
+  value = cur_node->value_;
+
+#ifdef USE_HHVM
+  std::unique_lock<std::mutex> lock(latch_, std::try_to_lock);
+
+  if (!lock.owns_lock()) {
+    value = cur_node->value_;
+    return true;
+  }
+#endif
+
 #ifdef USE_HASH_RESIZER
   if (cur_node == nullptr || cur_node->key_ != key ||
       cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
@@ -53,9 +73,11 @@ auto LRUCACHE::Find(const Key& key, Value& value) -> bool {
     return false;
   }
 #endif
-  value = cur_node->value_;
-  remove_node(cur_node);
-  push_node(cur_node);
+
+  if (cur_node->inList()) {
+    remove_node(cur_node);
+    push_node(cur_node);
+  }
   return true;
 }
 

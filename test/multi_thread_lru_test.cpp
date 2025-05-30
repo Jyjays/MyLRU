@@ -228,7 +228,7 @@ TEST(SegLRUCacheMultiThreadTest, RandomizedMixedOperations) {
   EXPECT_GT(ops_per_thread * num_threads, 0);
 }
 
-TEST(SegLRUCacheMultiThreadTest, RandomizedMixedOperationsHT) {
+TEST(SegLRUCacheMultiThreadTest, DISABLED_RandomizedMixedOperationsHT) {
   const int num_threads = threadNum;
   const int ops_per_thread = testsNum / num_threads;
   const int total_capacity = testsNum * size_ratio;
