@@ -24,20 +24,20 @@ struct ShardHashFunc {
 struct HashFuncImpl {
   size_t operator()(int64_t key) const noexcept {
     uint64_t k = static_cast<uint64_t>(key);
-    k = (~k) + (k << 21);  // k = (k << 21) - k - 1;
-    k = k ^ (k >> 24);
-    k = (k + (k << 3)) + (k << 8);  // k * 265
-    k = k ^ (k >> 14);
-    k = (k + (k << 2)) + (k << 4);  // k * 21
-    k = k ^ (k >> 28);
-    k = k + (k << 31);
-    return static_cast<size_t>(k);
+    // k = (~k) + (k << 21);  // k = (k << 21) - k - 1;
+    // k = k ^ (k >> 24);
+    // k = (k + (k << 3)) + (k << 8);  // k * 265
+    // k = k ^ (k >> 14);
+    // k = (k + (k << 2)) + (k << 4);  // k * 21
+    // k = k ^ (k >> 28);
+    // k = k + (k << 31);
+    // return static_cast<size_t>(k);
     // return std::hash<int64_t>()(key);
-    // uint64_t x = static_cast<uint64_t>(key);
-    // x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    // x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
-    // x = x ^ (x >> 31);
-    // return static_cast<size_t>(x);
+    uint64_t x = static_cast<uint64_t>(key);
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+    x = x ^ (x >> 31);
+    return static_cast<size_t>(x);
   }
 };
 

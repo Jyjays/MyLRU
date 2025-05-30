@@ -78,6 +78,8 @@
         "__mutex_base": "cpp",
         "__bit_reference": "cpp",
         "__split_buffer": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "__locale": "cpp",
+        "__threading_support": "cpp"
     }
 }

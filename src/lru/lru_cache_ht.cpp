@@ -37,12 +37,12 @@ auto LRUCACHEHT::Find(const Key& key, Value& value) -> bool {
     return false;
   }
   value = cur_node->value_;
-  // std::unique_lock<std::mutex> lock(latch_, std::try_to_lock);
-  std::lock_guard<std::mutex> lock(latch_);
-  // if (!lock.owns_lock()) {
-  //   value = cur_node->value_;
-  //   return true;
-  // }
+  std::unique_lock<std::mutex> lock(latch_, std::try_to_lock);
+
+  if (!lock.owns_lock()) {
+    value = cur_node->value_;
+    return true;
+  }
   if (cur_node->inList()) {
     remove_node(cur_node);
     push_node(cur_node);

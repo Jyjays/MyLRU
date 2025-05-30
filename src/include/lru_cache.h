@@ -41,6 +41,9 @@ class LRUCache {
 
   auto Insert(const Key& key, Value value) -> bool;
 
+#ifdef USE_BUFFER
+  auto InsertBuffer(LRUNode* buffer_head, LRUNode* buffer_tail) -> void;
+#endif
   auto Remove(const Key& key) -> bool;
 
   auto Size() -> size_t;
@@ -61,6 +64,10 @@ class LRUCache {
   std::mutex latch_;
   size_t max_size_;
   size_t cur_size_;
+#ifdef PRE_ALLOCATE
+  std::vector<LRUNode> nodes_;
+  std::vector<size_t> free_list_;
+#endif
 
   auto evict() -> void;
 
@@ -69,6 +76,10 @@ class LRUCache {
   auto remove_node(LRUNode* node) -> void;
 
   auto remove_helper(const Key& key, LRUNode* del_node) -> bool;
+#ifdef PRE_ALLOCATE
+  auto allocate_node() -> LRUNode*;
+  auto release_node(LRUNode* node) -> void;
+#endif
 };
 
 template <typename Key, typename Value, typename Hash = HashFuncImpl,
@@ -77,6 +88,8 @@ class SegLRUCache {
  public:
   using ShardType = LRUCache<Key, Value>;
   using ResizerForShardsType = typename ShardType::ResizerType;
+  using LRUNode = typename ShardType::LRUNode;
+
   explicit SegLRUCache(size_t capacity);
   auto Find(const Key& key, Value& value) -> bool;
   auto Insert(const Key& key, Value value) -> bool;
@@ -90,8 +103,14 @@ class SegLRUCache {
   auto GetHis_Miss() -> void;
 
  private:
- 
   LRUCACHE lru_cache_[segNum];
+#ifdef USE_BUFFER
+  LRUNode* buffer_[segNum];
+  LRUNode* buffer_tail_[segNum];
+  size_t buffer_size_[segNum] = {0};
+  size_t buffer_capacity_[segNum] = {0};
+  std::mutex buffer_latch_[segNum];
+#endif
 
   // std::atomic<size_t> hit_count_ = 0;
   // std::atomic<size_t> miss_count_ = 0;
@@ -102,9 +121,7 @@ class SegLRUCache {
     return static_cast<uint32_t>(hash & (segNum - 1));
   }
 
-  static auto SegHash(const Key& key) -> size_t {
-    return ShardHashFunc()(key);
-  }
+  static auto SegHash(const Key& key) -> size_t { return ShardHashFunc()(key); }
 };
 
 }  // namespace myLru

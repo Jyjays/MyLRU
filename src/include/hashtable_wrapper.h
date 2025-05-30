@@ -31,7 +31,7 @@ class HashTableWrapper {
     my_table_.SetSize(4096);
 #elif defined(USE_SEG_HASH_TABLE)
     // printf("Using segmented hash table implementation.\n");
-    my_table_.SetSize(4096);
+    // my_table_.SetSize(4096);
 #endif
   }
 

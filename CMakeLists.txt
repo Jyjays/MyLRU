@@ -74,8 +74,8 @@ target_include_directories(mylru_tests_mt PRIVATE
 )
 
 # 为多线程测试目标添加预处理器定义
-target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
-# target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE)
+# target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
+target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE PRE_ALLOCATE)
 #USE_HASH_RESIZER USE_SHARED_LATCH)
 # target_compile_definitions(mylru_tests_mt PRIVATE USE_SEG_HASH_TABLE)
 #  USE_HASH_RESIZER USE_SHARED_LATCH

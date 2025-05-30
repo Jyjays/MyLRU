@@ -21,6 +21,14 @@ LRUCACHE::LRUCache(size_t size) : max_size_(size), cur_size_(0) {
   tail_ = new LRUNode();
   head_->next_ = tail_;
   tail_->prev_ = head_;
+#ifdef PRE_ALLOCATE
+  nodes_.reserve(size);
+  for (size_t i = 0; i < size; ++i) {
+    // nodes : vector<LRUNode> nodes_;
+    // nodes_.emplace_back();
+    free_list_.push_back(i);
+  }
+#endif
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
@@ -57,6 +65,24 @@ auto LRUCACHE::Insert(const Key& key, Value value) -> bool {
   if (cur_size_ == max_size_) {
     evict();
   }
+#ifdef PRE_ALLOCATE
+  LRUNode* new_node = allocate_node();
+  if (new_node == nullptr) {
+    return false;  // No free nodes available
+  }
+  new_node->key_ = key;
+  new_node->value_ = value;
+
+  if (!hash_table_.Insert(key, new_node)) {
+    release_node(new_node);
+    return false;
+  }
+
+  push_node(new_node);
+  cur_size_++;
+  return true;
+#else
+
   LRUNode* new_node = new LRUNode(key, value);
   if (!hash_table_.Insert(key, new_node)) {
     delete new_node;
@@ -66,6 +92,7 @@ auto LRUCACHE::Insert(const Key& key, Value value) -> bool {
   push_node(new_node);
   cur_size_++;
   return true;
+#endif
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
@@ -74,11 +101,24 @@ auto LRUCACHE::Remove(const Key& key) -> bool {
   if (cur_size_ == 0) {
     return false;
   }
+#ifdef PRE_ALLOCATE
+  LRUNode* to_remove;
+  if (!hash_table_.Get(key, to_remove)) {
+    return false;  // Key not found
+  }
+  if (to_remove == nullptr || to_remove->key_ != key ||
+      to_remove->next_ == nullptr || to_remove->prev_ == nullptr) {
+    LRU_ERR("Something wrong in hashtable.");
+    return false;
+  }
+  return remove_helper(key, to_remove);
+#else
   LRUNode* cur_node;
   if (!hash_table_.Get(key, cur_node)) {
     return false;
   }
   return remove_helper(key, cur_node);
+#endif
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
@@ -90,12 +130,24 @@ auto LRUCACHE::Size() -> size_t {
 LRUCACHE_TEMPLATE_ARGUMENTS
 auto LRUCACHE::Clear() -> void {
   std::lock_guard<std::mutex> lock(latch_);
+#ifdef PRE_ALLOCATE
+  for (size_t i = 0; i < nodes_.size(); ++i) {
+    nodes_[i].next_ = nullptr;
+    nodes_[i].prev_ = nullptr;
+  }
+  free_list_.clear();
+  free_list_.reserve(nodes_.size());
+  for (size_t i = 0; i < nodes_.size(); ++i) {
+    free_list_.push_back(i);
+  }
+#else
   LRUNode* cur_node = head_->next_;
   while (cur_node != tail_) {
     LRUNode* next_node = cur_node->next_;
     delete cur_node;
     cur_node = next_node;
   }
+#endif
   head_->next_ = tail_;
   tail_->prev_ = head_;
   hash_table_.Clear();
@@ -111,6 +163,14 @@ auto LRUCACHE::Resize(size_t size) -> void {
     }
   }
   max_size_ = size;
+#ifdef PRE_ALLOCATE
+  nodes_.resize(size);
+  free_list_.clear();
+  free_list_.reserve(size);
+  for (size_t i = 0; i < size; ++i) {
+    free_list_.push_back(i);
+  }
+#endif
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
@@ -119,12 +179,21 @@ auto LRUCACHE::evict() -> void {
   if (last_node == head_) {
     return;
   }
+#ifdef PRE_ALLOCATE
+  remove_node(last_node);
+  release_node(last_node);
+  if (!hash_table_.Remove(last_node->key_)) {
+    // LRU_ERR("Failed to remove key from hash table");
+  }
+  cur_size_--;
+#else
   remove_node(last_node);
   if (!hash_table_.Remove(last_node->key_)) {
     // LRU_ERR("Failed to remove key from hash table");
   }
   cur_size_--;
   delete last_node;
+#endif
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
@@ -150,21 +219,81 @@ LRUCACHE_TEMPLATE_ARGUMENTS
 auto LRUCACHE::remove_helper(const Key& key, LRUNode* del_node) -> bool {
   remove_node(del_node);
   hash_table_.Remove(key);
+#ifdef PRE_ALLOCATE
+  release_node(del_node);
+#else
   delete del_node;
+#endif
   cur_size_--;
   return true;
 }
+#ifdef USE_BUFFER
+LRUCACHE_TEMPLATE_ARGUMENTS
+auto LRUCACHE::InsertBuffer(LRUNode* buffer_head, LRUNode* buffer_tail)
+    -> void {
+  std::lock_guard<std::mutex> lock(latch_);
+  head_ = buffer_head;
+  tail_ = buffer_tail;
+  LRUNode* cur_node = head_->next_;
+  while (cur_node != tail_) {
+    LRUNode* next_node = cur_node->next_;
+    if (!hash_table_.Insert(cur_node->key_, cur_node)) {
+      // If insertion fails, we need to remove the node from the list
+      remove_node(cur_node);
+      delete cur_node;
+    } else {
+      cur_size_++;
+    }
+    cur_node = next_node;
+  }
+}
+#endif
+
+#ifdef PRE_ALLOCATE
+LRUCACHE_TEMPLATE_ARGUMENTS
+auto LRUCACHE::allocate_node() -> LRUNode* {
+  if (free_list_.empty()) {
+    return nullptr;  // No free nodes available
+  }
+  size_t index = free_list_.back();
+  free_list_.pop_back();
+  return &nodes_[index];
+}
+
+LRUCACHE_TEMPLATE_ARGUMENTS
+auto LRUCACHE::release_node(LRUNode* node) -> void {
+  if (node == nullptr) {
+    return;
+  }
+  size_t index = node - &nodes_[0];
+  free_list_.push_back(index);
+  node->next_ = nullptr;
+  node->prev_ = nullptr;
+}
+#endif
 
 // ---------------------------------------
 //            SegLRUCache
 //----------------------------------------
 
 LRUCACHE_TEMPLATE_ARGUMENTS
-SEGLRUCACHE::SegLRUCache(size_t capacity) : lru_cache_() {
+SEGLRUCACHE::SegLRUCache(size_t capacity_per_seg) : lru_cache_() {
   for (size_t i = 0; i < segNum; ++i) {
-    lru_cache_[i].Resize(capacity);
+    lru_cache_[i].Resize(capacity_per_seg);
 #ifdef USE_HASH_RESIZER
     lru_cache_[i].SetResizer(&resizer_);
+#endif
+
+#ifdef USE_BUFFER
+    buffer_[i] = new LRUNode();
+    buffer_tail_[i] = new LRUNode();
+    buffer_[i]->next_ = buffer_tail_[i];
+    buffer_[i]->prev_ = nullptr;
+
+    buffer_tail_[i]->prev_ = buffer_[i];
+    buffer_tail_[i]->next_ = nullptr;
+    buffer_size_[i] = 0;
+    buffer_capacity_[i] = capacity_per_seg;
 #endif
   }
 }
@@ -181,8 +310,29 @@ auto SEGLRUCACHE::Find(const Key& key, Value& value) -> bool {
 
 LRUCACHE_TEMPLATE_ARGUMENTS
 auto SEGLRUCACHE::Insert(const Key& key, Value value) -> bool {
-  int32_t hash = SegHash(key);
-  return lru_cache_[Shard(hash)].Insert(key, value);
+  uint32_t shard_idx = Shard(SegHash(key));
+#ifdef USE_BUFFER
+  std::unique_lock<std::mutex> lock(buffer_latch_[shard_idx]);
+  if (buffer_size_[shard_idx] >= buffer_capacity_[shard_idx]) {
+    // Buffer is full, flush it to the LRU cache
+    lru_cache_[shard_idx].InsertBuffer(buffer_[shard_idx],
+                                       buffer_tail_[shard_idx]);
+    buffer_[shard_idx]->next_ = buffer_tail_[shard_idx];
+    buffer_tail_[shard_idx]->prev_ = buffer_[shard_idx];
+    buffer_size_[shard_idx] = 0;  // Reset buffer size after flushing
+  }
+  // Insert into the buffer
+  LRUNode* new_node = new LRUNode(key, value);
+  LRUNode* ori_first = buffer_[shard_idx]->next_;
+  ori_first->prev_ = new_node;
+  new_node->next_ = ori_first;
+  new_node->prev_ = buffer_[shard_idx];
+  buffer_[shard_idx]->next_ = new_node;
+  buffer_size_[shard_idx]++;
+  return true;
+#else
+  return lru_cache_[shard_idx].Insert(key, value);
+#endif
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS
