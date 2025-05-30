@@ -23,6 +23,8 @@ template <typename Key, typename Value, typename Hash = HashFuncImpl,
           typename KeyEqual = std::equal_to<Key>>
 class LRUCacheHT {
  public:
+  struct LRUNode;
+  inline static LRUNode* const OutOfListMarker = reinterpret_cast<LRUNode*>(-1);
   struct LRUNode {
     LRUNode() : next_(nullptr), prev_(nullptr) {}
     LRUNode(const Key& key, const Value& value) : key_(key), value_(value) {}
@@ -31,10 +33,11 @@ class LRUCacheHT {
     LRUNode* prev_;
     Key key_;
     Value value_;
+
+    auto inList() -> bool { return prev_ != LRUCacheHT::OutOfListMarker; }
   };
 
   using ResizerType = HashTableResizer<Key, LRUNode*, Hash, KeyEqual>;
-
   LRUCacheHT();
   LRUCacheHT(size_t size);
   LRUCacheHT(const LRUCacheHT&) = delete;
@@ -43,7 +46,7 @@ class LRUCacheHT {
 
   auto Find(const Key& key, Value& value) -> bool;
 
-  auto Insert(const Key& key, Value value) -> bool;
+  auto Insert(const Key& key, const Value& value) -> bool;
 
   auto Remove(const Key& key) -> bool;
 
@@ -83,7 +86,7 @@ class SegLRUCacheHT {
   using ResizerForShardsType = typename ShardType::ResizerType;
   explicit SegLRUCacheHT(size_t capacity);
   auto Find(const Key& key, Value& value) -> bool;
-  auto Insert(const Key& key, Value value) -> bool;
+  auto Insert(const Key& key, const Value& value) -> bool;
   auto Remove(const Key& key) -> bool;
   auto Size() -> size_t;
   auto Clear() -> void;
@@ -105,10 +108,7 @@ class SegLRUCacheHT {
     return static_cast<uint32_t>(hash & (segNum - 1));
   }
 
-  static auto SegHash(const Key& key) -> size_t {
-    return Hash()(key);
-  }
-
+  static auto SegHash(const Key& key) -> size_t { return Hash()(key); }
 };
 
 }  // namespace myLru

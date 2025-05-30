@@ -36,34 +36,33 @@ auto LRUCACHEHT::Find(const Key& key, Value& value) -> bool {
   if (!hash_table_.Get(key, cur_node)) {
     return false;
   }
-  std::unique_lock<std::mutex> lock(latch_, std::try_to_lock);
-  if (!lock.owns_lock()) {
-    value = cur_node->value_;
-    return true;
-  }
-  // if (cur_node == nullptr || cur_node->key_ != key ||
-  //     cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
-  //   // LRU_ERR("Something wrong in hashtable.");
-  //   return false;
-  // }
   value = cur_node->value_;
-  remove_node(cur_node);
-  push_node(cur_node);
+  // std::unique_lock<std::mutex> lock(latch_, std::try_to_lock);
+  std::lock_guard<std::mutex> lock(latch_);
+  // if (!lock.owns_lock()) {
+  //   value = cur_node->value_;
+  //   return true;
+  // }
+  if (cur_node->inList()) {
+    remove_node(cur_node);
+    push_node(cur_node);
+  }
   return true;
 }
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
-auto LRUCACHEHT::Insert(const Key& key, Value value) -> bool {
+auto LRUCACHEHT::Insert(const Key& key, const Value& value) -> bool {
   std::lock_guard<std::mutex> lock(latch_);
-  if (cur_size_ == max_size_) {
-    evict();
-  }
+
   LRUNode* new_node = new LRUNode(key, value);
   if (!hash_table_.Insert(key, new_node)) {
     delete new_node;
     return false;
   }
-
+  // std::lock_guard<std::mutex> lock(latch_);
+  if (cur_size_ == max_size_) {
+    evict();
+  }
   push_node(new_node);
   cur_size_++;
   return true;
@@ -71,13 +70,13 @@ auto LRUCACHEHT::Insert(const Key& key, Value value) -> bool {
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
 auto LRUCACHEHT::Remove(const Key& key) -> bool {
-  std::lock_guard<std::mutex> lock(latch_);
-  if (cur_size_ == 0) {
-    return false;
-  }
   LRUNode* cur_node;
   if (!hash_table_.Get(key, cur_node)) {
     return false;
+  }
+  std::lock_guard<std::mutex> lock(latch_);
+  if (!cur_node->inList()) {
+    return true;
   }
   return remove_helper(key, cur_node);
 }
@@ -195,7 +194,7 @@ auto SEGLRUCACHEHT::Find(const Key& key, Value& value) -> bool {
 }
 
 LRUCACHEHT_TEMPLATE_ARGUMENTS
-auto SEGLRUCACHEHT::Insert(const Key& key, Value value) -> bool {
+auto SEGLRUCACHEHT::Insert(const Key& key, const Value& value) -> bool {
   int32_t hash = SegHash(key);
   return lru_cache_[Shard(hash)].Insert(key, value);
 }

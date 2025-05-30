@@ -42,6 +42,8 @@ class MyHashTable {
 #else
     std::lock_guard<std::mutex> lock(latch_);
 #endif
+#else
+    std::lock_guard<std::mutex> lock(latch_);
 #endif
     Value* found_value_ptr = FindValuePtr(key);
     if (found_value_ptr != nullptr) {
@@ -58,6 +60,8 @@ class MyHashTable {
 #else
     std::unique_lock<std::mutex> lock(latch_);
 #endif
+#else
+    std::unique_lock<std::mutex> lock(latch_);
 #endif
     size_t bucket_idx = GetBucketIndex(key);
     auto current_list = current_list_.load();
@@ -72,7 +76,7 @@ class MyHashTable {
         return false;
       }
     }
-    if (resizing_) {
+    if (resizing_.load()) {
       // If resizing, check in the temp list
       size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_size);
       std::vector<std::pair<Key, Value>>& temp_chain =
@@ -96,8 +100,8 @@ class MyHashTable {
     if (elems_ > 2 * length_) {
 #ifdef USE_HASH_RESIZER
       // Check if resizing is already in progress!!
-      if (resizer_ != nullptr && !resizing_) {
-        resizing_ = true;
+      if (resizer_ != nullptr && resizing_.load() == false) {
+        resizing_.store(true);
         if (temp_list_.empty()) {
           initialize_temp_list();
         }
@@ -107,6 +111,7 @@ class MyHashTable {
         Resize();
       }
 #else
+      // lock.unlock();
       Resize();
 #endif
     }
@@ -120,11 +125,13 @@ class MyHashTable {
 #else
     std::lock_guard<std::mutex> lock(latch_);
 #endif
+#else 
+    std::lock_guard<std::mutex> lock(latch_);
 #endif
     auto current_list = current_list_.load();
     size_t bucket_idx = GetBucketIndex(key);
 
-    if (resizing_) {
+    if (resizing_.load()) {
       // std::lock_guard<std::mutex> lock(latch_);
       size_t temp_bucket_idx = GetBucketIndexInternal(key, temp_list_size);
       std::vector<std::pair<Key, Value>>& temp_chain =
@@ -159,6 +166,8 @@ class MyHashTable {
 #else
     std::lock_guard<std::mutex> lock(latch_);
 #endif
+#else
+    //std::lock_guard<std::mutex> lock(latch_);
 #endif
     size_t new_length_ = length_ << 1;
     std::vector<std::vector<std::pair<Key, Value>>> new_list(new_length_);
@@ -185,8 +194,8 @@ class MyHashTable {
       length_ = new_length_;
       list_ = std::move(new_list);
       current_list_.store(&list_);
-      resizing_ = false;
-      //resizer_->DelayGC(*old_list_ptr_.load());
+      resizing_.store(false);
+      // resizer_->DelayGC(*old_list_ptr_.load());
       return;
     }
     for (auto& chain : temp_list_) {
@@ -201,8 +210,10 @@ class MyHashTable {
     length_ = new_length_;
     list_ = std::move(new_list);
     current_list_.store(&list_);
-   // resizer_->DelayGC(*old_list_ptr_.load());
-    resizing_ = false;
+    // resizer_->DelayGC(*old_list_ptr_.load());
+    // printf("Resized hash table from %zu to %zu buckets.\n", length_ / 2,
+    //        length_);
+    resizing_.store(false);
   }
 
   auto SetSize(size_t size) -> void {
@@ -212,6 +223,8 @@ class MyHashTable {
 #else
     std::lock_guard<std::mutex> lock(latch_);
 #endif
+#else 
+    std::lock_guard<std::mutex> lock(latch_);
 #endif
     if (size == 0) {
       size = 1;
@@ -233,6 +246,8 @@ class MyHashTable {
 #else
     std::lock_guard<std::mutex> lock(latch_);
 #endif
+#else 
+    std::lock_guard<std::mutex> lock(latch_);
 #endif
     for (auto& chain : list_) {
       chain.clear();

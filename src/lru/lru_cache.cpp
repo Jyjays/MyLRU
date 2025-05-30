@@ -40,8 +40,8 @@ auto LRUCACHE::Find(const Key& key, Value& value) -> bool {
 #ifdef USE_HASH_RESIZER
   if (cur_node == nullptr || cur_node->key_ != key ||
       cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
-    // LRU_ERR("Something wrong in hashtable.");
-    // std::cout << key << " " << cur_node->key_ << std::endl;
+    LRU_ERR("Something wrong in hashtable.");
+    std::cout << key << " " << cur_node->key_ << std::endl;
     return false;
   }
 #endif
