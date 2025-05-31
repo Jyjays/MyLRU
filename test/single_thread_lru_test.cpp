@@ -8,14 +8,12 @@
 
 #include "lru_cache.h"
 
+namespace myLru {  // Using your namespace
 ValueType generateValueForKey(KeyType key) {
   ValueType value{};
   std::memcpy(value.data(), &key, sizeof(KeyType));
   return value;
 }
-
-namespace myLru {  // Using your namespace
-
 // --- Basic Insert, Find, Remove Test ---
 TEST(LRUCacheSingleThreadTest, BasicOperations) {
   const size_t capacity = 100;

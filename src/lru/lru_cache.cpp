@@ -216,6 +216,7 @@ auto LRUCACHE::evict() -> void {
   cur_size_--;
   delete last_node;
 #endif
+  
 }
 
 LRUCACHE_TEMPLATE_ARGUMENTS

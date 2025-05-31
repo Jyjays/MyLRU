@@ -5,7 +5,12 @@
 #include <iostream>
 #include <string>
 
-static const int kNumSegBits = 4;
+#ifndef NUM_SEGBITS
+#define NUM_SEGBITS 4
+#endif
+
+namespace myLru {
+static const int kNumSegBits = NUM_SEGBITS;
 static const int segNum = 1 << kNumSegBits;
 
 static const int threadNum = 8;
@@ -59,3 +64,5 @@ using KeyEqualType = std::equal_to<KeyType>;
       exit(EXIT_FAILURE);                                    \
     }                                                        \
   } while (0)
+
+}  // namespace myLru

@@ -1,6 +1,6 @@
 # Ignore the build directory
 build/
-
+build_*
 # Ignore all executable files
 *.exe
 *.out

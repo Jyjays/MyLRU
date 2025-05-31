@@ -85,7 +85,9 @@ class SegHashTable {
   }
 
   void SetSize(size_t size) {
-    // 暂不实现
+    length_ = size;
+    list_.resize(size);
+    bucket_locks_.resize(size);
   }
 
   void Resize() {
@@ -112,7 +114,8 @@ class SegHashTable {
 
  private:
   std::vector<std::vector<std::pair<Key, Value>>> list_;
-  //std::atomic<std::vector<std::vector<std::pair<Key, Value>>>*> current_list_;
+  // std::atomic<std::vector<std::vector<std::pair<Key, Value>>>*>
+  // current_list_;
   std::vector<std::mutex> bucket_locks_;
   size_t length_;
   std::atomic<size_t> elems_{0};

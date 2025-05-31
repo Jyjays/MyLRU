@@ -38,8 +38,6 @@ add_executable(mylru_tests
     src/lru/lru_cache_ht.cpp
 )
 
-
-
 # 为单线程测试目标添加包含目录
 target_include_directories(mylru_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
@@ -75,7 +73,7 @@ target_include_directories(mylru_tests_mt PRIVATE
 
 # 为多线程测试目标添加预处理器定义
 # target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
-# target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE PRE_ALLOCATE USE_HASH_RESIZER USE_SHARED_LATCH)
+# target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE PRE_ALLOCATE)
 #USE_HASH_RESIZER USE_SHARED_LATCH)
 target_compile_definitions(mylru_tests_mt PRIVATE PRE_ALLOCATE USE_SEG_HASH_TABLE)
 #  USE_HASH_RESIZER USE_SHARED_LATCH
@@ -85,7 +83,6 @@ target_link_libraries(mylru_tests_mt PRIVATE
     gtest_main
     Threads::Threads
 )
-
 
 add_executable(mylru_tests_mt_ht
     test/multi_thread_lru_ht_test.cpp
@@ -100,9 +97,9 @@ target_include_directories(mylru_tests_mt_ht PRIVATE
 )
 
 # 为多线程测试目标添加预处理器定义
-#target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_LIBCUCKOO)
-# target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_MY_HASH_TABLE PRE_ALLOCATE USE_HASH_RESIZER USE_SHARED_LATCH)
-target_compile_definitions(mylru_tests_mt_ht PRIVATE PRE_ALLOCATE USE_SEG_HASH_TABLE)
+# target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_HHVM USE_LIBCUCKOO)
+#target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_HHVM USE_MY_HASH_TABLE PRE_ALLOCATE)
+target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_HHVM PRE_ALLOCATE USE_SEG_HASH_TABLE)
 
 # 链接 Google Test 和 Pthreads
 target_link_libraries(mylru_tests_mt_ht PRIVATE
@@ -110,6 +107,14 @@ target_link_libraries(mylru_tests_mt_ht PRIVATE
     gtest_main
     Threads::Threads
 )
+
+if(DEFINED K_NUM_SEG_BITS_FROM_CMAKE)
+    message(STATUS "编译时 NUM_SEGBITS 将被设置为: ${K_NUM_SEG_BITS_FROM_CMAKE}")
+    target_compile_definitions(mylru_tests_mt PRIVATE "NUM_SEGBITS=${K_NUM_SEG_BITS_FROM_CMAKE}")
+    target_compile_definitions(mylru_tests_mt_ht PRIVATE "NUM_SEGBITS=${K_NUM_SEG_BITS_FROM_CMAKE}")
+else()
+    message(STATUS "将使用 config.h 中定义的默认 NUM_SEGBITS 值。")
+endif()
 
 # 启用测试
 enable_testing()

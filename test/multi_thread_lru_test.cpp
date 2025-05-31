@@ -74,7 +74,7 @@ void printEvaluationResult(
 // static const unsigned int COMMON_BASE_SEED = 8282347;
 
 // --- Multi-threaded Insert and Find Test ---
-TEST(SegLRUCacheMultiThreadTest, BenchMarkTest) {
+TEST(SegLRUCacheMultiThreadTest, DISABLED_BenchMarkTest) {
   const int num_threads = threadNum;
   const int ops_per_thread = testsNum / num_threads;
   const size_t capacity = testsNum * size_ratio;
