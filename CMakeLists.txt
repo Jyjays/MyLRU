@@ -26,7 +26,6 @@ add_subdirectory(third_party/libcuckoo)
 
 # 查找并链接 Pthreads
 find_package(Threads REQUIRED)
-# target_link_libraries(mylru PRIVATE Threads::Threads)
 
 # 添加 Google Test
 add_subdirectory(third_party/googletest)
@@ -46,8 +45,6 @@ target_include_directories(mylru_tests PRIVATE
 )
 
 # 为单线程测试目标添加预处理器定义
-# target_compile_definitions(mylru_tests PRIVATE USE_LIBCUCKOO)
-
 target_compile_definitions(mylru_tests PRIVATE USE_MY_HASH_TABLE)
 
 # 链接 Google Test 和 Pthreads
@@ -71,12 +68,17 @@ target_include_directories(mylru_tests_mt PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/libcuckoo"  # 确保 libcuckoo 头文件路径
 )
 
-# 为多线程测试目标添加预处理器定义
-# target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
-# target_compile_definitions(mylru_tests_mt PRIVATE USE_MY_HASH_TABLE PRE_ALLOCATE)
-#USE_HASH_RESIZER USE_SHARED_LATCH)
-target_compile_definitions(mylru_tests_mt PRIVATE PRE_ALLOCATE USE_SEG_HASH_TABLE)
-#  USE_HASH_RESIZER USE_SHARED_LATCH
+# 处理多线程测试的编译条件
+if(DEFINED MYLRU_TESTS_MT_FEATURES)
+    message(STATUS "使用 MYLRU_TESTS_MT_FEATURES: ${MYLRU_TESTS_MT_FEATURES}")
+    foreach(FEATURE ${MYLRU_TESTS_MT_FEATURES})
+        target_compile_definitions(mylru_tests_mt PRIVATE ${FEATURE})
+    endforeach()
+else()
+    message(STATUS "使用默认编译条件: USE_LIBCUCKOO")
+    target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
+endif()
+
 # 链接 Google Test 和 Pthreads
 target_link_libraries(mylru_tests_mt PRIVATE
     gtest
@@ -89,6 +91,7 @@ add_executable(mylru_tests_mt_ht
     src/lru/lru_cache.cpp
     src/lru/lru_cache_ht.cpp
 )
+
 # 为多线程测试目标添加包含目录
 target_include_directories(mylru_tests_mt_ht PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
@@ -96,10 +99,16 @@ target_include_directories(mylru_tests_mt_ht PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/libcuckoo"  # 确保 libcuckoo 头文件路径
 )
 
-# 为多线程测试目标添加预处理器定义
-# target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_HHVM USE_LIBCUCKOO)
-#target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_HHVM USE_MY_HASH_TABLE PRE_ALLOCATE)
-target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_HHVM PRE_ALLOCATE USE_SEG_HASH_TABLE)
+# 处理多线程 HT 测试的编译条件
+if(DEFINED MYLRU_TESTS_MT_HT_FEATURES)
+    message(STATUS "使用 MYLRU_TESTS_MT_HT_FEATURES: ${MYLRU_TESTS_MT_HT_FEATURES}")
+    foreach(FEATURE ${MYLRU_TESTS_MT_HT_FEATURES})
+        target_compile_definitions(mylru_tests_mt_ht PRIVATE ${FEATURE})
+    endforeach()
+else()
+    message(STATUS "使用默认编译条件: USE_HHVM PRE_ALLOCATE USE_SEG_HASH_TABLE")
+    target_compile_definitions(mylru_tests_mt_ht PRIVATE USE_HHVM PRE_ALLOCATE USE_SEG_HASH_TABLE)
+endif()
 
 # 链接 Google Test 和 Pthreads
 target_link_libraries(mylru_tests_mt_ht PRIVATE
@@ -121,6 +130,7 @@ enable_testing()
 add_test(NAME MyLRUTests COMMAND mylru_tests)
 add_test(NAME MyLRUMultiThreadTests COMMAND mylru_tests_mt)
 add_test(NAME MyLRUMultiThreadTestsHT COMMAND mylru_tests_mt_ht)
+
 # 打印调试信息
 message(STATUS "Configuring MYLRU_Cache project")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
