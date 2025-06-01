@@ -11,7 +11,7 @@ from datetime import datetime
 PROJECT_ROOT_DIR = "/home/jyjays/LAB/MyLRU"  
 BUILD_DIR_BASE_NAME = "build_kbits"       
 CMAKE_BUILD_TYPE = "Release"             
-K_NUM_SEG_BITS_TO_TEST = [0, 1, 2, 3, 4, 5, 6, 7] 
+K_NUM_SEG_BITS_TO_TEST = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10] 
 
 # 设置日志记录
 LOG_DIR = "logs"
@@ -184,7 +184,7 @@ def plot_throughput_comparison(csv_filename):
 def main():
     logging.info("开始分段测试运行")
     all_results_summary = []
-    config = TEST_CONFIGURATIONS[0]  
+    config = TEST_CONFIGURATIONS[1]  
     mt_features = config["mt_features"]
     mt_ht_features = config["mt_ht_features"]
         

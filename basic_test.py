@@ -11,6 +11,7 @@ from datetime import datetime
 # --- 用户配置 ---
 PROJECT_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".")) # 假设脚本在项目根目录
 BUILD_DIR_BASE_NAME = "build_scenario"
+NUM_RUNS = 10  # 每个配置运行的次数
 
 # 设置日志记录
 LOG_DIR = "logs"
@@ -187,10 +188,17 @@ def run_command(cmd_list, working_dir=None, step_name="Command", timeout_seconds
 
 def create_performance_table(all_run_data):
     """
-    创建性能测试结果的可视化表格
+    创建性能测试结果的可视化表格，显示多次运行的平均值
     """
     # 创建结果字典
     results = {
+        "Single LRU": {},
+        "SegLRU": {},
+        "SegLRU HT": {}
+    }
+    
+    # 用于存储多次运行的数据
+    run_data = {
         "Single LRU": {},
         "SegLRU": {},
         "SegLRU HT": {}
@@ -210,27 +218,46 @@ def create_performance_table(all_run_data):
         
         # 根据可执行文件和测试用例名称分类
         if executable == "mylru_tests_mt" and "BenchMark Test (Single LRU)" in test_case:
-            results["Single LRU"][config_name] = {
-                "Throughput": throughput,
-                "Hit Ratio": hit_ratio,
-                "Actual Run Time": actual_run_time
-            }
+            category = "Single LRU"
         elif executable == "mylru_tests_mt" and "Randomized Mixed Operations Test (SegLRUCache)" in test_case:
-            results["SegLRU"][config_name] = {
-                "Throughput": throughput,
-                "Hit Ratio": hit_ratio,
-                "Actual Run Time": actual_run_time
-            }
+            category = "SegLRU"
         elif executable == "mylru_tests_mt_ht" and "Randomized Mixed Operations Test (SegLRUCache)" in test_case:
-            results["SegLRU HT"][config_name] = {
-                "Throughput": throughput,
-                "Hit Ratio": hit_ratio,
-                "Actual Run Time": actual_run_time
+            category = "SegLRU HT"
+        else:
+            continue
+
+        # 初始化配置的数据结构
+        if config_name not in run_data[category]:
+            run_data[category][config_name] = {
+                "Throughput": [],
+                "Hit Ratio": [],
+                "Actual Run Time": []
+            }
+        
+        # 添加数据
+        if throughput is not None:
+            run_data[category][config_name]["Throughput"].append(throughput)
+        if hit_ratio is not None:
+            run_data[category][config_name]["Hit Ratio"].append(hit_ratio)
+        if actual_run_time is not None:
+            run_data[category][config_name]["Actual Run Time"].append(actual_run_time)
+    
+    # 计算平均值
+    for category in run_data:
+        for config_name, metrics in run_data[category].items():
+            avg_throughput = sum(metrics["Throughput"]) / len(metrics["Throughput"]) if metrics["Throughput"] else None
+            avg_hit_ratio = sum(metrics["Hit Ratio"]) / len(metrics["Hit Ratio"]) if metrics["Hit Ratio"] else None
+            avg_run_time = sum(metrics["Actual Run Time"]) / len(metrics["Actual Run Time"]) if metrics["Actual Run Time"] else None
+            
+            results[category][config_name] = {
+                "Throughput": avg_throughput,
+                "Hit Ratio": avg_hit_ratio,
+                "Actual Run Time": avg_run_time
             }
     
     # 创建表格数据
     table_data = []
-    headers = ["Implementation", "Configuration", "Throughput (ops/sec)", "Hit Ratio (%)", "Actual Run Time (s)"]
+    headers = ["Implementation", "Configuration", "Avg Throughput (ops/sec)", "Avg Hit Ratio (%)", "Avg Run Time (s)"]
     
     for impl, configs in results.items():
         for config, metrics in configs.items():
@@ -252,12 +279,12 @@ def create_performance_table(all_run_data):
     table = tabulate(table_data, headers=headers, tablefmt="grid")
     
     # 打印表格
-    print("\n性能测试结果表格:")
+    print("\n性能测试结果表格 (平均值):")
     print(table)
     
     # 保存到文件
     with open("performance_results.txt", "w") as f:
-        f.write("性能测试结果表格:\n")
+        f.write("性能测试结果表格 (平均值):\n")
         f.write(table)
     
     print("\n结果已保存到 performance_results.txt")
@@ -268,7 +295,7 @@ def main():
     all_run_data = []
     csv_filename = "lru_benchmark_final_results.csv"
     csv_fieldnames = [
-        "Config_Name", "kNumSegBits", "SegNum", "Executable", "GTest_Case_Name", "Status",
+        "Config_Name", "kNumSegBits", "SegNum", "Executable", "GTest_Case_Name", "Run_Number", "Status",
         "Throughput (ops/sec)", "Hit Ratio (%)", "Actual Run Time (s)", "FailedOutput"
     ]
 
@@ -310,7 +337,7 @@ def main():
         if not success:
             all_run_data.append({
                 "Config_Name": config_name, "kNumSegBits": k_bits, "SegNum": seg_num,
-                "Executable": "N/A (CMake Failed)", "GTest_Case_Name": "N/A", 
+                "Executable": "N/A (CMake Failed)", "GTest_Case_Name": "N/A", "Run_Number": 0,
                 "Status": "CMAKE_ERROR", "FailedOutput": cmake_stdout + cmake_stderr
             })
             continue
@@ -320,7 +347,7 @@ def main():
         if not success:
             all_run_data.append({
                 "Config_Name": config_name, "kNumSegBits": k_bits, "SegNum": seg_num,
-                "Executable": "N/A (Build Failed)", "GTest_Case_Name": "N/A", 
+                "Executable": "N/A (Build Failed)", "GTest_Case_Name": "N/A", "Run_Number": 0,
                 "Status": "BUILD_ERROR", "FailedOutput": build_stdout + build_stderr
             })
             continue
@@ -331,50 +358,53 @@ def main():
                 print(f"  警告: 测试可执行文件未找到: {test_exe_path}")
                 all_run_data.append({
                     "Config_Name": config_name, "kNumSegBits": k_bits, "SegNum": seg_num,
-                    "Executable": exe_name, "GTest_Case_Name": "N/A", 
+                    "Executable": exe_name, "GTest_Case_Name": "N/A", "Run_Number": 0,
                     "Status": "EXE_NOT_FOUND", "FailedOutput": f"{exe_name} not found"
                 })
                 continue
 
             print(f"  运行测试: {exe_name}")
-            # 对于测试运行，即使返回码非0，我们也继续解析输出，因为GTest失败会返回非0
-            run_success, stdout_str, stderr_str = run_command([test_exe_path], step_name=f"运行 {exe_name}")
             
-            full_output = stdout_str + stderr_str
-            parsed_metrics_list = parse_gtest_output(full_output)
-
-            if not parsed_metrics_list: # 如果解析器未能提取任何测试用例块
-                 all_run_data.append({
-                    "Config_Name": config_name, "kNumSegBits": k_bits, "SegNum": seg_num,
-                    "Executable": exe_name, "GTest_Case_Name": "Unknown (Parse Failed)", 
-                    "Status": "PARSE_ERROR", "FailedOutput": full_output[:1000] + "..." if len(full_output) > 1000 else full_output
-                })
-                 print(f"    测试 {exe_name} 的输出解析失败。")
-                 continue
-
-
-            for metrics_data in parsed_metrics_list:
-                gtest_case_name = metrics_data.get("GTest_Case_Name", "Unknown Test Case")
-                test_status = "PASSED" # 先假设通过
-
-                # GTest 失败判断：可执行文件返回码非0，或者输出中包含失败标志
-                if not run_success or GTEST_FAILURE_INDICATOR in full_output:
-                    test_status = "FAILED"
+            # 运行多次测试
+            for run_number in range(1, NUM_RUNS + 1):
+                print(f"    运行 #{run_number}/{NUM_RUNS}")
+                # 对于测试运行，即使返回码非0，我们也继续解析输出，因为GTest失败会返回非0
+                run_success, stdout_str, stderr_str = run_command([test_exe_path], step_name=f"运行 {exe_name} (运行 #{run_number})")
                 
-                # 如果解析时遇到错误，也标记为失败
-                if "Error" in metrics_data:
-                    test_status = "PARSE_ERROR"
+                full_output = stdout_str + stderr_str
+                parsed_metrics_list = parse_gtest_output(full_output)
 
-                all_run_data.append({
-                    "Config_Name": config_name, "kNumSegBits": k_bits, "SegNum": seg_num,
-                    "Executable": exe_name, "GTest_Case_Name": gtest_case_name, 
-                    "Status": test_status,
-                    "Throughput (ops/sec)": metrics_data.get("Throughput (ops/sec)"),
-                    "Hit Ratio (%)": metrics_data.get("Hit Ratio (%)"),
-                    "Actual Run Time (s)": metrics_data.get("Actual Run Time (s)"),
-                    "FailedOutput": full_output if test_status == "FAILED" else ""
-                })
-                print(f"    可执行文件: {exe_name}, 测试用例: {gtest_case_name}, 状态: {test_status}, 指标: { {k:v for k,v in metrics_data.items() if k != 'GTest_Case_Name'} }")
+                if not parsed_metrics_list: # 如果解析器未能提取任何测试用例块
+                     all_run_data.append({
+                        "Config_Name": config_name, "kNumSegBits": k_bits, "SegNum": seg_num,
+                        "Executable": exe_name, "GTest_Case_Name": "Unknown (Parse Failed)", "Run_Number": run_number,
+                        "Status": "PARSE_ERROR", "FailedOutput": full_output[:1000] + "..." if len(full_output) > 1000 else full_output
+                    })
+                     print(f"      测试 {exe_name} 的输出解析失败。")
+                     continue
+
+                for metrics_data in parsed_metrics_list:
+                    gtest_case_name = metrics_data.get("GTest_Case_Name", "Unknown Test Case")
+                    test_status = "PASSED" # 先假设通过
+
+                    # GTest 失败判断：可执行文件返回码非0，或者输出中包含失败标志
+                    if not run_success or GTEST_FAILURE_INDICATOR in full_output:
+                        test_status = "FAILED"
+                    
+                    # 如果解析时遇到错误，也标记为失败
+                    if "Error" in metrics_data:
+                        test_status = "PARSE_ERROR"
+
+                    all_run_data.append({
+                        "Config_Name": config_name, "kNumSegBits": k_bits, "SegNum": seg_num,
+                        "Executable": exe_name, "GTest_Case_Name": gtest_case_name, "Run_Number": run_number,
+                        "Status": test_status,
+                        "Throughput (ops/sec)": metrics_data.get("Throughput (ops/sec)"),
+                        "Hit Ratio (%)": metrics_data.get("Hit Ratio (%)"),
+                        "Actual Run Time (s)": metrics_data.get("Actual Run Time (s)"),
+                        "FailedOutput": full_output if test_status == "FAILED" else ""
+                    })
+                    print(f"      可执行文件: {exe_name}, 测试用例: {gtest_case_name}, 状态: {test_status}, 指标: { {k:v for k,v in metrics_data.items() if k != 'GTest_Case_Name'} }")
 
     print("\n\n===== 所有测试运行总结写入CSV =====")
     with open(csv_filename, 'w', newline='') as csvfile:

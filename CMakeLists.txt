@@ -75,8 +75,8 @@ if(DEFINED MYLRU_TESTS_MT_FEATURES)
         target_compile_definitions(mylru_tests_mt PRIVATE ${FEATURE})
     endforeach()
 else()
-    message(STATUS "使用默认编译条件: USE_LIBCUCKOO")
-    target_compile_definitions(mylru_tests_mt PRIVATE USE_LIBCUCKOO)
+    message(STATUS "使用默认编译条件")
+    target_compile_definitions(mylru_tests_mt PRIVATE PRE_ALLOCATE USE_MY_HASH_TABLE USE_HASH_RESIZER)
 endif()
 
 # 链接 Google Test 和 Pthreads

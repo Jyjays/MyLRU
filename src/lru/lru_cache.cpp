@@ -68,8 +68,8 @@ auto LRUCACHE::Find(const Key& key, Value& value) -> bool {
 #ifdef USE_HASH_RESIZER
   if (cur_node == nullptr || cur_node->key_ != key ||
       cur_node->next_ == nullptr || cur_node->prev_ == nullptr) {
-    LRU_ERR("Something wrong in hashtable.");
-    std::cout << key << " " << cur_node->key_ << std::endl;
+    // LRU_ERR("Something wrong in hashtable.");
+    // std::cout << key << " " << cur_node->key_ << std::endl;
     return false;
   }
 #endif
@@ -130,7 +130,7 @@ auto LRUCACHE::Remove(const Key& key) -> bool {
   }
   if (to_remove == nullptr || to_remove->key_ != key ||
       to_remove->next_ == nullptr || to_remove->prev_ == nullptr) {
-    LRU_ERR("Something wrong in hashtable.");
+    // LRU_ERR("Something wrong in hashtable.");
     return false;
   }
   return remove_helper(key, to_remove);
