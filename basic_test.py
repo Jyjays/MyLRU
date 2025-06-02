@@ -2,14 +2,14 @@ import subprocess
 import os
 import shutil
 import csv
-import re # 用于解析输出
+import re 
 import pandas as pd
 from tabulate import tabulate
 import logging
 from datetime import datetime
 
 # --- 用户配置 ---
-PROJECT_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".")) # 假设脚本在项目根目录
+PROJECT_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "."))
 BUILD_DIR_BASE_NAME = "build_scenario"
 NUM_RUNS = 10  # 每个配置运行的次数
 
@@ -19,7 +19,6 @@ if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 LOG_FILENAME = os.path.join(LOG_DIR, f"cpp_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
 
-# 配置日志记录器
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -62,14 +61,11 @@ TEST_CONFIGURATIONS = [
     }
 ]
 
-# 要为每个配置运行的测试可执行文件
 EXECUTABLES_TO_RUN = ["mylru_tests_mt", "mylru_tests_mt_ht"]
 
-# Google Test 输出指示符
 GTEST_FAILURE_INDICATOR = "[  FAILED  ]"
 GTEST_PASSED_INDICATOR = "[  PASSED  ]"
 
-# --- 辅助函数 ---
 def parse_gtest_output(output_str):
     """
     解析 Google Test 输出，提取每个测试用例的名称和指标。
@@ -78,7 +74,6 @@ def parse_gtest_output(output_str):
     """
     parsed_test_cases = []
     
-    # 首先按分隔符 "----------------------------------------" 分割，尝试找到每个测试的输出块
     output_blocks = output_str.split("----------------------------------------")
     
     current_test_name_from_gtest_run_line = None
@@ -87,19 +82,17 @@ def parse_gtest_output(output_str):
         block = block.strip()
         if not block:
             continue
-
-        # 尝试从 GTest 的 [ RUN      ] 行提取测试名
+        
         run_line_match = re.search(r"\[ RUN      \] ([\w\.]+)", block)
         if run_line_match:
             current_test_name_from_gtest_run_line = run_line_match.group(1)
 
-        # 查找您自定义的 "Test: " 标记
+       
         test_name_match = re.search(r"Test: (.+)", block)
         if test_name_match:
             gtest_case_name = test_name_match.group(1).strip()
             metrics = {}
             try:
-                # 修改正则表达式以正确处理科学计数法
                 throughput_match = re.search(r"Throughput(?: \(Planned Ops\))?: ([\d\.]+(?:[eE][+-]?\d+)?)\s*ops/sec", block)
                 if throughput_match: 
                     metrics["Throughput (ops/sec)"] = float(throughput_match.group(1))
@@ -124,7 +117,6 @@ def parse_gtest_output(output_str):
     if not parsed_test_cases and current_test_name_from_gtest_run_line:
         overall_metrics = {}
         try:
-            # 修改正则表达式以正确处理科学计数法
             throughput_match = re.search(r"Throughput(?: \(Planned Ops\))?: ([\d\.]+(?:[eE][+-]?\d+)?)\s*ops/sec", output_str)
             if throughput_match: 
                 overall_metrics["Throughput (ops/sec)"] = float(throughput_match.group(1))
@@ -187,24 +179,18 @@ def run_command(cmd_list, working_dir=None, step_name="Command", timeout_seconds
         return False, "", str(e)
 
 def create_performance_table(all_run_data):
-    """
-    创建性能测试结果的可视化表格，显示多次运行的平均值
-    """
-    # 创建结果字典
     results = {
         "Single LRU": {},
         "SegLRU": {},
         "SegLRU HT": {}
     }
     
-    # 用于存储多次运行的数据
     run_data = {
         "Single LRU": {},
         "SegLRU": {},
         "SegLRU HT": {}
     }
     
-    # 遍历所有运行数据
     for data in all_run_data:
         if data["Status"] != "PASSED":
             continue
@@ -242,7 +228,6 @@ def create_performance_table(all_run_data):
         if actual_run_time is not None:
             run_data[category][config_name]["Actual Run Time"].append(actual_run_time)
     
-    # 计算平均值
     for category in run_data:
         for config_name, metrics in run_data[category].items():
             avg_throughput = sum(metrics["Throughput"]) / len(metrics["Throughput"]) if metrics["Throughput"] else None
@@ -305,7 +290,7 @@ def main():
         logging.error("错误：PROJECT_ROOT_DIR ('%s') 似乎不是有效的项目根目录。请检查路径。", PROJECT_ROOT_DIR)
         return
 
-    k_bits = FIXED_K_NUM_SEG_BITS # 使用固定的 k_bits
+    k_bits = FIXED_K_NUM_SEG_BITS 
     seg_num = 1 << k_bits
     
     for config_info in TEST_CONFIGURATIONS:
@@ -313,7 +298,7 @@ def main():
         mt_features = config_info["mt_features"]
         mt_ht_features = config_info["mt_ht_features"]
         
-        current_run_id_prefix = f"{config_name}" # 构建目录不再包含 k_bits
+        current_run_id_prefix = f"{config_name}"
         print(f"\n===== 开始测试配置: {config_name} (固定 kNumSegBits={k_bits}, segNum={seg_num}) =====")
 
         build_path = os.path.join(PROJECT_ROOT_DIR, f"{BUILD_DIR_BASE_NAME}_{current_run_id_prefix}")

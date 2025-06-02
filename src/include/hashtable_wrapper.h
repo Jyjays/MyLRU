@@ -1,6 +1,7 @@
 #ifndef HASHTABLE_WRAPPER_H
 #define HASHTABLE_WRAPPER_H
 
+#include <cstddef>
 #ifdef USE_LIBCUCKOO
 #include <libcuckoo/cuckoohash_map.hh>
 #elif defined(USE_MY_HASH_TABLE)
@@ -20,14 +21,14 @@ namespace myLru {
 template <typename Key, typename Value, typename Hash = std::hash<Key>,
           typename KeyEqual = std::equal_to<Key>>
 class HashTableWrapper {
- public:
+public:
   using HashTableResizerType = HashTableResizer<Key, Value, Hash, KeyEqual>;
   HashTableWrapper() {
 #ifdef USE_LIBCUCKOO
     // table_.set_num_buckets(16);
     // printf("Using libcuckoo hash table.\n");
 #elif defined(USE_MY_HASH_TABLE)
-    //printf("Using custom hash table implementation.\n");
+    // printf("Using custom hash table implementation.\n");
     my_table_.SetSize(4096);
 #elif defined(USE_SEG_HASH_TABLE)
     // printf("Using segmented hash table implementation.\n");
@@ -43,21 +44,21 @@ class HashTableWrapper {
     table_.clear();
 #elif defined(USE_MY_HASH_TABLE)
     my_table_.Clear();
-    //printf("Using segmented hash table implementation.\n");
+    // printf("Using segmented hash table implementation.\n");
 #elif defined(USE_SEG_HASH_TABLE)
-    //printf("Using segmented hash table implementation.\n");
+    // printf("Using segmented hash table implementation.\n");
     my_table_.Clear();
 #endif
   }
 
-  HashTableWrapper(const HashTableWrapper&) = delete;
-  HashTableWrapper& operator=(const HashTableWrapper&) = delete;
+  HashTableWrapper(const HashTableWrapper &) = delete;
+  HashTableWrapper &operator=(const HashTableWrapper &) = delete;
 
   // Allow move construction and move assignment
-  HashTableWrapper(HashTableWrapper&&) = default;
-  HashTableWrapper& operator=(HashTableWrapper&&) = default;
+  HashTableWrapper(HashTableWrapper &&) = default;
+  HashTableWrapper &operator=(HashTableWrapper &&) = default;
 
-  auto Insert(const Key& key, const Value& value) -> bool {
+  auto Insert(const Key &key, const Value &value) -> bool {
 #ifdef USE_LIBCUCKOO
     return table_.insert(key, value);
 #elif defined(USE_MY_HASH_TABLE)
@@ -67,7 +68,7 @@ class HashTableWrapper {
 #endif
   }
 
-  auto Get(const Key& key, Value& value_out) -> bool {
+  auto Get(const Key &key, Value &value_out) -> bool {
 #ifdef USE_LIBCUCKOO
     return table_.find(key, value_out);
 #elif defined(USE_MY_HASH_TABLE)
@@ -77,7 +78,7 @@ class HashTableWrapper {
 #endif
   }
 
-  auto Remove(const Key& key) -> bool {
+  auto Remove(const Key &key) -> bool {
 #ifdef USE_LIBCUCKOO
     return table_.erase(key);
 #elif defined(USE_MY_HASH_TABLE)
@@ -87,7 +88,7 @@ class HashTableWrapper {
 #endif
   }
 
-  auto Size() const -> size_t {  // Marked const as it doesn't modify the table
+  auto Size() const -> size_t { // Marked const as it doesn't modify the table
 #ifdef USE_LIBCUCKOO
     return table_.size();
 #elif defined(USE_MY_HASH_TABLE)
@@ -107,7 +108,7 @@ class HashTableWrapper {
 #endif
   }
 
-  auto SetResizer(HashTableResizerType* resizer) -> void {
+  auto SetResizer(HashTableResizerType *resizer) -> void {
 #ifdef USE_MY_HASH_TABLE
     my_table_.SetResizer(resizer);
 #elif defined(USE_SEG_HASH_TABLE)
@@ -115,7 +116,17 @@ class HashTableWrapper {
 #endif
   }
 
- private:
+  auto SetSize(size_t size) -> void {
+#ifdef USE_LIBCUCKOO
+    table_.set_num_buckets(size);
+#elif defined(USE_MY_HASH_TABLE)
+    my_table_.SetSize(size);
+#elif defined(USE_SEG_HASH_TABLE)
+    my_table_.SetSize(size);
+#endif
+  }
+
+private:
 #ifdef USE_LIBCUCKOO
   libcuckoo::cuckoohash_map<Key, Value, Hash, KeyEqual> table_;
 #elif defined(USE_MY_HASH_TABLE)
@@ -125,6 +136,6 @@ class HashTableWrapper {
 #endif
 };
 
-}  // namespace myLru
+} // namespace myLru
 
-#endif  // HASHTABLE_WRAPPER_H
+#endif // HASHTABLE_WRAPPER_H

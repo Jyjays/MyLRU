@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "config.h"
+#include "hash_table.h"
 
 namespace myLru {
 
@@ -25,7 +26,7 @@ class SegHashTable {
 
   SegHashTable(size_t size) : length_(size) {
     list_.resize(size);
-    bucket_locks_.resize(size);
+    bucket_locks_ = std::vector<std::mutex>(size);
     // current_list_.store(&list_);
   }
 
@@ -87,7 +88,8 @@ class SegHashTable {
   void SetSize(size_t size) {
     length_ = size;
     list_.resize(size);
-    bucket_locks_.resize(size);
+    // 创建新的mutex vector而不是resize
+    bucket_locks_ = std::vector<std::mutex>(size);
   }
 
   void Resize() {

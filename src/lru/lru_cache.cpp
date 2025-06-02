@@ -184,6 +184,7 @@ auto LRUCACHE::Resize(size_t size) -> void {
       evict();
     }
   }
+  hash_table_.SetSize(size);
   max_size_ = size;
 #ifdef PRE_ALLOCATE
   nodes_.resize(size);

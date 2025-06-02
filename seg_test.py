@@ -64,7 +64,6 @@ TEST_EXECUTABLES = [
 GTEST_FAILURE_INDICATOR = "[  FAILED  ]"
 GTEST_PASSED_INDICATOR = "[  PASSED  ]"
 
-# --- 辅助函数 ---
 
 def parse_gtest_output(output_str, executable_name):
     """
@@ -73,24 +72,23 @@ def parse_gtest_output(output_str, executable_name):
     """
     results = {}
     try:
-        # 查找 SegLRUCache 测试的输出块
         seglru_match = re.search(r"Test: Randomized Mixed Operations Test \(SegLRUCache\)(.*?)(?=Test:|$)", 
                                 output_str, re.DOTALL)
         
         if seglru_match:
             test_output = seglru_match.group(1)
             
-            # 尝试提取吞吐量 (Ops/sec)
+            # 提取吞吐量 (Ops/sec)
             throughput_match = re.search(r"Throughput(?: \(Planned Ops\))?: ([\d\.]+)\s*ops/sec", test_output)
             if throughput_match:
                 results["Throughput (ops/sec)"] = float(throughput_match.group(1))
 
-            # 尝试提取命中率 (%)
+            # 提取命中率 (%)
             hit_ratio_match = re.search(r"Hit Ratio(?: \(Finds\))?: ([\d\.]+)\s*%", test_output)
             if hit_ratio_match:
                 results["Hit Ratio (%)"] = float(hit_ratio_match.group(1))
-            
-            # 尝试提取实际运行时间 (seconds)
+    
+            # 提取实际运行时间 (seconds)
             run_time_match = re.search(r"Actual Run Time: ([\d\.]+)\s*seconds", test_output)
             if run_time_match:
                 results["Actual Run Time (s)"] = float(run_time_match.group(1))
@@ -184,7 +182,7 @@ def plot_throughput_comparison(csv_filename):
 def main():
     logging.info("开始分段测试运行")
     all_results_summary = []
-    config = TEST_CONFIGURATIONS[1]  
+    config = TEST_CONFIGURATIONS[4]  
     mt_features = config["mt_features"]
     mt_ht_features = config["mt_ht_features"]
         
